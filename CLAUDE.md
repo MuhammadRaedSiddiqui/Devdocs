@@ -32,15 +32,15 @@ plaintext keys.
 ```
 devdocs-ai/
 ├── apps/
-│   ├── web/                    Next.js 14 App Router (Vercel)
-│   └── api/                    Express.js API server (Railway / Fly.io)
+│   ├── web/                    Next.js 14 App Router + tRPC client (Vercel)
+│   └── api/                    Hono server + tRPC router (Railway / Fly.io)
 ├── packages/
 │   └── shared/                 Shared types, Zod schemas, prompt builder
 ├── .github/workflows/ci.yml
 ├── turbo.json
 ├── pnpm-workspace.yaml
 ├── CLAUDE.md                   ← you are here
-├── PROMPT_MIGRATION.md         6-phase migration prompts (phases 4-6 pending)
+├── IMPLEMENTATION_STRATEGY.md  6-phase implementation plan (Phases 2-4 complete)
 ├── PROMPT_01_AI_PROVIDERS.md   Anthropic + OpenAI dual-provider prompt (executed)
 ├── PROMPT_02_BEDROCK.md        Amazon Bedrock third-provider prompt
 └── CLAUDE_CODE_PROMPTS.md      14 feature improvement prompts
@@ -55,20 +55,22 @@ devdocs-ai/
 |---|---|---|
 | Framework | Next.js 14 App Router | All pages are `"use client"` — no RSC data fetching yet |
 | State — interview | Zustand (`lib/interview/store.ts`) | The interview state machine. Never put interview state in React state |
-| State — server data | TanStack Query (Phase 6, pending) | Currently raw `useEffect` + fetch |
+| State — server data | TanStack Query via tRPC | Full-stack type safety. All queries auto-invalidate on mutation |
+| API client | tRPC React (`@trpc/react-query`) | Type-safe API calls. Endpoint: `http://localhost:4000/trpc` |
 | Styling | Tailwind CSS + CSS Modules | Vellum design system (see below) |
 | Fonts | `next/font/google` — Lora + Inter | Self-hosted, no CDN. Variables: `--font-lora`, `--font-inter` |
-| AI (client-side) | `@anthropic-ai/sdk`, `openai` | BYOK only, `dangerouslyAllowBrowser: true` until Phase 5 |
-| Auth (pending) | Better Auth | Phase 4 of migration. Currently middleware is cookie-presence only |
+| AI streaming | Server-side only | Fetches `/ai/stream` SSE endpoint. No `dangerouslyAllowBrowser` |
+| Auth | Clerk | `@clerk/nextjs`. Token passed via `Authorization: Bearer` header |
 
-### apps/api (Express backend)
+### apps/api (Hono backend)
 | Concern | Tool | Notes |
 |---|---|---|
-| Framework | Express.js + TypeScript | `tsx watch` in dev, compiled to `dist/` in prod |
-| Database | PostgreSQL via Drizzle ORM | Schema in `src/schema.ts`. Use `drizzle-kit push` in dev |
-| Cache / sessions | Upstash Redis | Sessions, rate limit counters, 24h AI response cache |
-| Auth | Better Auth | Google + GitHub OAuth + email/password. Sessions in Redis |
-| AI streaming | SSE endpoint `POST /ai/stream` | Reads encrypted key from DB, streams to client |
+| Framework | Hono + TypeScript | `tsx watch` in dev, compiled to `dist/` in prod. 50k+ req/s |
+| API layer | tRPC (`@trpc/server`) | Type-safe RPC. Router at `/trpc`. Uses Fetch adapter |
+| Database | PostgreSQL via Drizzle ORM | Schema in `src/schema.ts`. Use `drizzle-kit generate` for migrations |
+| Cache / rate limits | Upstash Redis | Rate limit counters, 24h AI response cache |
+| Auth | Clerk | `@clerk/express`. Middleware verifies tokens, maps to local UUID |
+| AI streaming | SSE endpoint `POST /ai/stream` | Reads encrypted key from DB, streams to client via ReadableStream |
 | Key vault | AES-256-GCM (`src/lib/crypto.ts`) | Keys encrypted at rest. Never returned after save |
 
 ### packages/shared
@@ -226,28 +228,30 @@ Each of the 10 domains has one of three interaction modes:
 ## API design
 
 ### Base URL
-- Dev: `http://localhost:4000` (Next.js rewrites `/api/*` to this in dev via `next.config.ts`)
+- Dev: `http://localhost:4000`
 - Prod: `https://api.devdocs.ai`
 
 ### Auth
-All routes except `/health` and `/auth/*` require the `devdocs_session` cookie
-set by Better Auth. The `requireAuth` middleware reads and validates it.
+All tRPC routes use the `protectedProcedure` which requires a valid Clerk token
+in the `Authorization: Bearer` header. The context middleware verifies the token,
+fetches the user from Clerk, and maps to the local UUID via `getOrCreateUser()`.
 
 ### Route structure
 ```
-GET    /health                     Public health check
-ALL    /auth/*                     Better Auth (sign-in, OAuth, callbacks)
-GET    /projects                   List user's projects
-POST   /projects                   Create project
-GET    /projects/:id               Get single project (includes interviewData)
-PATCH  /projects/:id               Update project / save interview progress
-DELETE /projects/:id               Soft delete
-POST   /ai/stream                  SSE — stream an AI response
-POST   /ai/invalidate              Bust Redis cache for a domain section
-GET    /ai/bedrock-status          Is Bedrock configured on this server?
-GET    /keys                       List saved API key stubs (masked)
-POST   /keys                       Verify + save a new API key
-DELETE /keys/:provider             Remove a key
+GET    /health                     Public health check (Hono REST)
+ALL    /trpc/*                     tRPC endpoint (type-safe RPC over HTTP POST)
+POST   /ai/stream                  SSE — stream an AI response (Hono REST)
+POST   /keys                       Verify + save a new API key (Hono REST)
+DELETE /keys/:provider             Remove a key (Hono REST)
+```
+
+### tRPC Procedures (all under `/trpc`)
+```
+projects.list                       List user's projects
+projects.get({ id })                Get single project (includes interviewData)
+projects.create({ name, type })     Create project
+projects.update({ id, data })       Update project / save interview progress
+projects.delete({ id })             Soft delete
 ```
 
 ### SSE streaming format
@@ -309,13 +313,14 @@ This prompt is identical for all providers. Never hardcode prompts outside this 
 
 ### Schema overview (`apps/api/src/schema.ts`)
 ```
-users               id, email, display_name, avatar_url
-sessions            id, user_id → users, token, expires_at
-accounts            id, user_id → users, provider, provider_account_id (OAuth)
+users               id (uuid), clerk_id (text, unique), email, display_name, avatar_url
 projects            id, user_id → users, name, type, status, interview_data (JSONB), deleted_at
 documentation_bundles  id, project_id → projects, domain_id, content
 user_api_keys       id, user_id → users, provider, key_hash (AES encrypted), masked_key
 ```
+
+**Note:** No `sessions` or `accounts` tables. Clerk handles authentication;
+the API only stores a mapping from `clerk_id` → local `uuid` for relational integrity.
 
 ### `interview_data` JSONB shape
 ```ts
@@ -346,17 +351,17 @@ ai:doc:{projectId}:{domainId}          Cached AI doc section (TTL = 86400s / 24h
 
 ---
 
-## Testing the interview end-to-end (no API key required)
+## Testing the interview end-to-end
 
-The mock streaming in `apps/web/lib/interview/store.ts` lets you run the full
-interview without a real API key. The `streamAIResponse` mock sends a
-word-by-word stream of the opener/doc text. This is intentional — it makes
-local development fast.
+**All AI streaming now requires a valid API key** — there is no mock mode.
+The frontend calls the `/ai/stream` endpoint on the Hono API, which decrypts
+the user's stored key and streams from Anthropic or OpenAI.
 
-To switch to real AI:
-1. Add your Anthropic or OpenAI key via Settings → API Key
-2. The store calls `getActiveConfig()` before every reply — if a key is found,
-   it uses the real SDK; the mock is only used when no key is configured
+To test:
+1. Sign in with Clerk
+2. Go to Settings → API Key
+3. Add your Anthropic or OpenAI key (verified + encrypted server-side)
+4. Create a project and start the interview
 
 ---
 
@@ -368,12 +373,18 @@ To switch to real AI:
 3. Add the route condition in `app/(app)/settings/page.tsx`
 4. Add the sidebar item in `SettingsSidebar.tsx`
 
-### Add a new API endpoint
-1. Create or update the route file in `apps/api/src/routes/`
-2. Add a Zod schema for the request body in `packages/shared/src/schemas.ts`
-3. Use `validateBody(YourSchema)` middleware in the route
-4. Mount the router in `apps/api/src/index.ts`
-5. Add the endpoint to the route structure table in this file
+### Add a new tRPC procedure
+1. Add the procedure to the appropriate router in `apps/api/src/trpc/routers/`
+2. Add a Zod schema for input/output in `packages/shared/src/schemas.ts`
+3. Use `.input(YourSchema)` and `.query()` or `.mutation()`
+4. Export from the router and mount in `apps/api/src/trpc/router.ts`
+5. The frontend gets automatic type inference — no manual types needed
+
+### Add a new Hono REST endpoint (for SSE or webhooks)
+1. Create the route in `apps/api/src/routes/hono/`
+2. Add middleware: `app.use('*', requireClerkAuth)` if protected
+3. Mount in `apps/api/src/hono-app.ts`: `app.route('/your-path', yourRouter)`
+4. Hono is only for SSE streaming or non-RPC endpoints. Prefer tRPC for CRUD.
 
 ### Add a new page to apps/web
 1. Create the file at the correct path under `app/(app)/` or `app/(auth)/`
@@ -419,9 +430,9 @@ Test with the mock first (no API cost), then verify with a real key.
   all test fixtures and seed data.
 
 - **Never break the middleware.ts route protection rules.** Protected prefixes:
-  `/dashboard`, `/project`, `/settings`, `/docs`. Public: `/`, `/login`,
-  `/signup`, `/forgot-password`, `/auth/*`. Changing this requires updating
-  both `apps/web/middleware.ts` AND the Better Auth config in `apps/api/src/lib/auth.ts`.
+  `/dashboard`, `/project`, `/settings`, `/docs`. Public: `/`, `/sign-in`,
+  `/sign-up`. Clerk handles auth — middleware only redirects unauthenticated
+  users to `/sign-in`. No auth config in the API beyond token verification.
 
 ---
 
@@ -432,9 +443,7 @@ corresponding prompt file before starting work on any of them.
 
 | Feature | Prompt file | Status |
 |---|---|---|
-| Better Auth wiring in apps/web | `PROMPT_MIGRATION.md` Phase 4 | Pending |
-| AI streaming moved to apps/api | `PROMPT_MIGRATION.md` Phase 5 | Pending |
-| TanStack Query for server state | `PROMPT_MIGRATION.md` Phase 6 | Pending |
+| Clerk auth + tRPC + server streaming | `IMPLEMENTATION_STRATEGY.md` Phases 1-4 | ✅ **Complete** |
 | Amazon Bedrock provider | `PROMPT_02_BEDROCK.md` | Pending |
 | Error states + timeout handling | `CLAUDE_CODE_PROMPTS.md` Prompt 4 | Pending |
 | Domain skipping by project type | `CLAUDE_CODE_PROMPTS.md` Prompt 5 | Pending |
@@ -459,14 +468,17 @@ corresponding prompt file before starting work on any of them.
 - Environment variables: all `NEXT_PUBLIC_*` vars
 
 ### apps/api → Railway
-- Start command: `node dist/index.js`
+- Start command: `node dist/hono-server.js`
 - Build command: `pnpm --filter @devdocs/api build`
-- Environment variables: all API vars (DATABASE_URL, UPSTASH_*, SESSION_SECRET,
-  ENCRYPTION_KEY, GOOGLE_*, GITHUB_*, WEB_URL, PORT)
+- Environment variables: `DATABASE_URL`, `UPSTASH_REDIS_REST_URL`,
+  `UPSTASH_REDIS_REST_TOKEN`, `ENCRYPTION_KEY`, `CLERK_SECRET_KEY`,
+  `CLERK_PUBLISHABLE_KEY`, `WEB_URL`, `PORT`
 
-### OAuth callback URLs to register before going live
-- Google Console: `https://api.yourdomain.com/auth/callback/google`
-- GitHub OAuth App: `https://api.yourdomain.com/auth/callback/github`
+### Clerk setup
+- Create a Clerk application at https://dashboard.clerk.com
+- Enable sign-in/sign-up in the Clerk dashboard
+- Add environment variables to both apps/web and apps/api
+- No OAuth callback URLs needed — Clerk handles all OAuth flows
 
 ### CI (GitHub Actions)
 `.github/workflows/ci.yml` runs on every push and PR:
