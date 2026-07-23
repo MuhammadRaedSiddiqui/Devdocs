@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom Design Tokens */
+:root {
+  --vellum-bg: #faf9f5; --vellum-surface: #ffffff;
+  --vellum-border: #dedcd1; --vellum-border-light: #ece9e1;
+  --ink: #141413; --ink-secondary: #3d3d3a; --ink-muted: #73726c; --ink-faint: #9c9a92;
+  --terracotta: #d97757;
+  --danger: #c0392b; --danger-bg: #fdf2f2; --danger-border: #f3c4c4;
+  --font-mono: "JetBrains Mono", Menlo, monospace;
+}
+
+/* Badge Utilities */
+.badge-blue { background: #e6f1fb; color: #0c447c; }
+.badge-green { background: #eaf3de; color: #27500a; }
+.badge-amber { background: #faeeda; color: #854f0b; }
+.badge-purple { background: #eeedfe; color: #534ab7; }
+.badge-orange { background: #fce8d6; color: #7a3410; }
+
+/* Base Styles */
+body { background-color: var(--vellum-bg); color: var(--ink); }
+.font-serif-heading { font-family: var(--font-lora), Georgia, serif; font-weight: 400; }

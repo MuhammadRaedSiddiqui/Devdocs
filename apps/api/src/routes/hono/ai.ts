@@ -1,0 +1,75 @@
+import { Hono } from 'hono';
+import { and, eq } from 'drizzle-orm';
+import { StreamRequestSchema, buildSystemPrompt, type AIProvider } from '@devdocs/shared';
+import { db, documentationBundles, projects } from '../../lib/db';
+import { streamAIResponse } from '../../lib/aiStream';
+import { checkRateLimit } from '../../lib/rateLimit';
+import { requireClerkAuth } from '../../middleware/hono-clerk-auth';
+import { loadDecryptedKey } from './keys';
+
+const models: Record<AIProvider, string> = { anthropic: 'claude-sonnet-4-6', openai: 'gpt-4o' };
+
+// Per-user/provider AI generation limit: 20 requests per minute.
+const AI_RATE_LIMIT = 20;
+const AI_RATE_WINDOW_SEC = 60;
+
+const app = new Hono();
+app.use('*', requireClerkAuth);
+
+app.post('/stream', async (c) => {
+  const parsed = StreamRequestSchema.safeParse(await c.req.json());
+  if (!parsed.success) return c.json({ error: 'validation_error', fields: parsed.error.flatten().fieldErrors }, 400);
+  const { projectId, domainId, userMessage, provider } = parsed.data;
+  const userId = c.get('userId');
+  const project = await db.query.projects.findFirst({
+    where: and(eq(projects.id, projectId), eq(projects.userId, userId)),
+  });
+  if (!project) return c.json({ error: 'not_found', message: 'Project not found.' }, 404);
+
+  // Per-user/provider rate limit — applied after ownership is confirmed so that
+  // unauthorized probes don't consume a legitimate user's budget.
+  const limit = await checkRateLimit(`ai:stream:${userId}:${provider}`, AI_RATE_LIMIT, AI_RATE_WINDOW_SEC);
+  if (!limit.allowed) {
+    return c.json(
+      { error: 'rate_limit', message: `Rate limit reached. Try again in ${limit.resetIn}s.` },
+      429,
+      { 'retry-after': String(limit.resetIn) }
+    );
+  }
+
+  const apiKey = await loadDecryptedKey(userId, provider);
+  if (!apiKey) return c.json({ error: 'no_key', message: `No ${provider} API key found.` }, 400);
+  const data = (project.interviewData ?? {}) as Record<string, unknown>;
+  if (!data.lockedContext) return c.json({ error: 'invalid_project', message: 'Complete project discovery first.' }, 400);
+
+  const encoder = new TextEncoder();
+  const abort = new AbortController();
+  c.req.raw.signal.addEventListener('abort', () => abort.abort(), { once: true });
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      let closed = false;
+      const send = (event: Record<string, unknown>) => {
+        if (!closed) controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+      };
+      const close = () => { if (!closed) { closed = true; controller.close(); } };
+      const timeout = setTimeout(() => { abort.abort(); send({ type: 'error', errorType: 'timeout', message: 'Request timed out after 30 seconds.' }); close(); }, 30_000);
+      const prompt = buildSystemPrompt(data.lockedContext as Parameters<typeof buildSystemPrompt>[0], domainId, (data.elaboration as string) ?? '', (data.lockedChoices as Parameters<typeof buildSystemPrompt>[3]) ?? {});
+      streamAIResponse(prompt, userMessage, { provider, apiKey, model: models[provider] }, {
+        onToken: (text) => send({ type: 'token', text }),
+        onDone: async (text) => {
+          clearTimeout(timeout);
+          await db.insert(documentationBundles).values({ projectId, domainId, content: text }).onConflictDoUpdate({
+            target: [documentationBundles.projectId, documentationBundles.domainId],
+            set: { content: text, updatedAt: new Date() },
+          });
+          send({ type: 'done', text }); close();
+        },
+        onError: (errorType, message) => { clearTimeout(timeout); send({ type: 'error', errorType, message }); close(); },
+      }, abort.signal);
+    },
+    cancel: () => abort.abort(),
+  });
+  return new Response(body, { headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' } });
+});
+
+export default app;

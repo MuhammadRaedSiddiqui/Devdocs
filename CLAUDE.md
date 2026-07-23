@@ -1,0 +1,477 @@
+# CLAUDE.md — DevDocs AI
+
+This file is read by Claude Code before every task. It contains everything
+needed to work on this codebase without re-explaining context in prompts.
+Keep it up to date as the project evolves.
+
+---
+
+## What this project is
+
+DevDocs AI is a pre-build planning tool for developers. It runs a structured
+AI interview across 10 planning domains (architecture, database design, auth,
+etc.), then generates a complete documentation bundle that AI coding agents
+(Claude Code, Cursor, Windsurf) can consume before writing any code.
+
+**Core user flow:**
+1. Developer creates a project on the dashboard (picks a name + type)
+2. Fills in a 4-question discovery form (team size, timeline, budget, experience)
+3. Works through a 10-domain AI interview — some domains use card pickers,
+   some open text, one uses a schema suggestion table
+4. Downloads a single merged `DOCUMENTATION.md` (or 10 separate files as ZIP)
+5. Drops the docs folder into their repo and points their coding agent at it
+
+**Business model:** BYOK (Bring Your Own Key) — users supply their own
+Anthropic, OpenAI, or Amazon Bedrock credentials. DevDocs AI never stores
+plaintext keys.
+
+---
+
+## Monorepo structure
+
+```
+devdocs-ai/
+├── apps/
+│   ├── web/                    Next.js 14 App Router (Vercel)
+│   └── api/                    Express.js API server (Railway / Fly.io)
+├── packages/
+│   └── shared/                 Shared types, Zod schemas, prompt builder
+├── .github/workflows/ci.yml
+├── turbo.json
+├── pnpm-workspace.yaml
+├── CLAUDE.md                   ← you are here
+├── PROMPT_MIGRATION.md         6-phase migration prompts (phases 4-6 pending)
+├── PROMPT_01_AI_PROVIDERS.md   Anthropic + OpenAI dual-provider prompt (executed)
+├── PROMPT_02_BEDROCK.md        Amazon Bedrock third-provider prompt
+└── CLAUDE_CODE_PROMPTS.md      14 feature improvement prompts
+```
+
+---
+
+## Tech stack
+
+### apps/web (Next.js frontend)
+| Concern | Tool | Notes |
+|---|---|---|
+| Framework | Next.js 14 App Router | All pages are `"use client"` — no RSC data fetching yet |
+| State — interview | Zustand (`lib/interview/store.ts`) | The interview state machine. Never put interview state in React state |
+| State — server data | TanStack Query (Phase 6, pending) | Currently raw `useEffect` + fetch |
+| Styling | Tailwind CSS + CSS Modules | Vellum design system (see below) |
+| Fonts | `next/font/google` — Lora + Inter | Self-hosted, no CDN. Variables: `--font-lora`, `--font-inter` |
+| AI (client-side) | `@anthropic-ai/sdk`, `openai` | BYOK only, `dangerouslyAllowBrowser: true` until Phase 5 |
+| Auth (pending) | Better Auth | Phase 4 of migration. Currently middleware is cookie-presence only |
+
+### apps/api (Express backend)
+| Concern | Tool | Notes |
+|---|---|---|
+| Framework | Express.js + TypeScript | `tsx watch` in dev, compiled to `dist/` in prod |
+| Database | PostgreSQL via Drizzle ORM | Schema in `src/schema.ts`. Use `drizzle-kit push` in dev |
+| Cache / sessions | Upstash Redis | Sessions, rate limit counters, 24h AI response cache |
+| Auth | Better Auth | Google + GitHub OAuth + email/password. Sessions in Redis |
+| AI streaming | SSE endpoint `POST /ai/stream` | Reads encrypted key from DB, streams to client |
+| Key vault | AES-256-GCM (`src/lib/crypto.ts`) | Keys encrypted at rest. Never returned after save |
+
+### packages/shared
+- `src/types.ts` — all shared TypeScript types (`Project`, `DomainId`, `AIProvider`, etc.)
+- `src/schemas.ts` — Zod schemas for all API request/response shapes
+- `src/prompts.ts` — `buildSystemPrompt()` used by both web (mock) and api (real)
+- `src/index.ts` — barrel export
+
+**Rule:** If a type is needed in both `apps/web` and `apps/api`, it lives in
+`packages/shared`. Never duplicate types across apps.
+
+---
+
+## Development workflow
+
+```bash
+# Start both apps (from repo root)
+pnpm dev
+# apps/web → http://localhost:3000
+# apps/api → http://localhost:4000
+
+# Individual apps
+pnpm --filter @devdocs/web dev
+pnpm --filter @devdocs/api dev
+
+# Typecheck everything before committing
+pnpm typecheck
+
+# Push DB schema changes (never write raw SQL)
+cd apps/api && pnpm drizzle-kit push
+```
+
+### Environment setup
+```bash
+cp .env.example apps/web/.env.local
+cp apps/api/.env.example apps/api/.env
+# Fill in DATABASE_URL, UPSTASH_REDIS_*, SESSION_SECRET,
+# ENCRYPTION_KEY, GOOGLE_CLIENT_ID/SECRET, GITHUB_CLIENT_ID/SECRET
+```
+
+`ENCRYPTION_KEY` must be exactly 64 hex characters (32 bytes):
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+---
+
+## Design system — Vellum
+
+All UI uses the Vellum design system. Never introduce new colours or spacing
+outside this system.
+
+### Key tokens (CSS custom properties in `app/globals.css`)
+```css
+--vellum-bg:           #faf9f5   /* page background — cream */
+--vellum-surface:      #ffffff   /* card surfaces */
+--vellum-border:       #dedcd1   /* primary borders */
+--vellum-border-light: #ece9e1   /* subtle borders */
+--ink:                 #141413   /* primary text */
+--ink-secondary:       #3d3d3a   /* secondary text */
+--ink-muted:           #73726c   /* muted text */
+--ink-faint:           #9c9a92   /* placeholder/faint text */
+--terracotta:          #d97757   /* brand accent */
+--danger:              #c0392b   /* destructive actions */
+--danger-bg:           #fdf2f2
+--danger-border:       #f3c4c4
+```
+
+### Tailwind utilities to use
+```
+bg-vellum         border-vellum-border     text-ink
+bg-vellum-surface border-vellum-border-light text-ink-secondary
+rounded-vellum    (= 9.6px)                text-ink-muted
+text-terracotta   bg-ink text-vellum        text-ink-faint
+```
+
+### Typography
+- Headings: `font-serif-heading` class → Lora, weight 400
+- Body: `font-sans` → Inter (default on `<body>`)
+- Code: `font-mono` → JetBrains Mono / Menlo
+
+### Badge colour pairs (for project type chips)
+```
+.badge-blue    .badge-green    .badge-amber    .badge-purple    .badge-orange
+```
+
+### Border radius
+Always `rounded-vellum` (9.6px) for cards and inputs. Never use `rounded` or
+`rounded-lg` unless matching a specific pre-existing element.
+
+### Card pattern
+```tsx
+<div className="bg-white border border-vellum-border rounded-vellum p-4">
+```
+
+### No shadows — borders only
+DevDocs AI uses border-based depth, never `shadow-*` classes. Exception: modals
+use a single `shadow-2xl` on the overlay card.
+
+---
+
+## Interview state machine
+
+The Zustand store in `apps/web/lib/interview/store.ts` is the most important
+file in the codebase. Understand it before touching anything interview-related.
+
+### Domain modes
+Each of the 10 domains has one of three interaction modes:
+
+| Mode | Domains | Behaviour |
+|---|---|---|
+| `"open"` | planning, api, frontend | AI asks one question, user types a free-text answer, AI generates the doc section |
+| `"cards"` | architecture, environment, auth, testing, monitoring, deployment | Inline card grid rendered inside a chat bubble. User picks one, AI confirms + generates |
+| `"schema"` | database | AI proposes a starter schema table, user edits/confirms, AI generates |
+
+### Key invariants — never regress these
+
+1. **Project type is captured ONCE** in the "New Project" modal on the dashboard.
+   `DiscoveryForm` shows it as a read-only locked chip. It must never ask for
+   the project type again inside the interview.
+
+2. **Planning domain never asks context it already has.** It asks exactly one
+   open question — "tell me about your project" — and the answer (`elaboration`
+   in the store) is used by every later domain's system prompt.
+
+3. **Card pickers render INLINE inside chat bubbles.** They use the `showCards`
+   flag on a `ChatMessage`. Never redirect to a separate page or panel for cards.
+
+4. **Database domain suggests a schema first.** It never asks "list your entities
+   cold." The AI proposes a starter schema; the user can ask for help, add fields,
+   or use the inline "+ Add" row. Only an explicit "Looks good" advances the domain.
+
+5. **Preview panel is hidden during the interview** (`width: 0`). It slides in
+   only once `store.isComplete === true`. Do not show partial documents while
+   the interview is running.
+
+6. **Single merged DOCUMENTATION.md** — the output is one file, not ten. The
+   10-file ZIP export is a separate feature.
+
+7. **`sendMessage` keeps working after `isComplete`.** Post-completion messages
+   trigger a clarification flow, not an error.
+
+### Adding a new domain
+1. Add the domain definition to `DOMAINS` in `lib/interview/domains.ts`
+2. Add its choices (if `cards` mode) to `CARD_CHOICES` in `lib/interview/choices.ts`
+3. Add its opener to `getOpener()` in `domains.ts`
+4. Add its doc template to `generateDoc()` in `domains.ts`
+5. Add it to `DomainId` in `packages/shared/src/types.ts`
+6. Add it to the Zod enum in `packages/shared/src/schemas.ts`
+7. The store, ChatPanel, DomainProgress, and PreviewPanel all read from `DOMAINS`
+   dynamically — they do not need changes for new domains.
+
+---
+
+## API design
+
+### Base URL
+- Dev: `http://localhost:4000` (Next.js rewrites `/api/*` to this in dev via `next.config.ts`)
+- Prod: `https://api.devdocs.ai`
+
+### Auth
+All routes except `/health` and `/auth/*` require the `devdocs_session` cookie
+set by Better Auth. The `requireAuth` middleware reads and validates it.
+
+### Route structure
+```
+GET    /health                     Public health check
+ALL    /auth/*                     Better Auth (sign-in, OAuth, callbacks)
+GET    /projects                   List user's projects
+POST   /projects                   Create project
+GET    /projects/:id               Get single project (includes interviewData)
+PATCH  /projects/:id               Update project / save interview progress
+DELETE /projects/:id               Soft delete
+POST   /ai/stream                  SSE — stream an AI response
+POST   /ai/invalidate              Bust Redis cache for a domain section
+GET    /ai/bedrock-status          Is Bedrock configured on this server?
+GET    /keys                       List saved API key stubs (masked)
+POST   /keys                       Verify + save a new API key
+DELETE /keys/:provider             Remove a key
+```
+
+### SSE streaming format
+Every event from `POST /ai/stream` is a JSON-encoded SSE data line:
+```
+data: {"type":"token","text":"accumulated text so far"}\n\n
+data: {"type":"done","text":"full completed text"}\n\n
+data: {"type":"error","errorType":"auth","message":"..."}\n\n
+```
+The client reads `type` to decide whether to update the streaming bubble,
+commit the final message, or show an error banner.
+
+### Error response shape
+```json
+{ "error": "snake_case_code", "message": "Human-readable string." }
+```
+Use these error codes consistently:
+- `unauthorized` — no session or session invalid
+- `not_found` — resource doesn't exist or belongs to another user
+- `validation_error` — Zod parse failure (includes `fields` map)
+- `rate_limit` — Redis rate limiter fired
+- `no_key` — no API key stored for this provider
+- `bedrock_not_configured` — AWS env vars missing
+- `server_error` — unexpected internal error
+
+---
+
+## AI providers
+
+Three providers are supported. All streaming goes through a single
+`streamAIResponse()` function — callers never know which provider is active.
+
+| Provider | Auth | Where keys live | Notes |
+|---|---|---|---|
+| Anthropic | `x-api-key` header | User's Postgres row (encrypted) | Default provider |
+| OpenAI | `Authorization: Bearer` | User's Postgres row (encrypted) | |
+| Bedrock | AWS env vars | `apps/api/.env` | Server-only. Not user-configurable |
+
+**Apps/web** (pre-Phase 5): keys in `localStorage`, streaming from browser via
+`dangerouslyAllowBrowser: true`.
+
+**Apps/api** (post-Phase 5): keys in Postgres encrypted with AES-256-GCM,
+streaming from the Express server. Browser never touches a key after submitting
+it to `POST /keys`.
+
+### System prompt
+`buildSystemPrompt()` in `packages/shared/src/prompts.ts` builds a
+context-rich prompt from:
+- `lockedContext` (project type, team size, timeline, budget, experience)
+- `elaboration` (the user's free-text project description from the planning domain)
+- `lockedChoices` (all card selections made so far)
+- `domainId` (which domain is currently active)
+
+This prompt is identical for all providers. Never hardcode prompts outside this function.
+
+---
+
+## Database
+
+### Schema overview (`apps/api/src/schema.ts`)
+```
+users               id, email, display_name, avatar_url
+sessions            id, user_id → users, token, expires_at
+accounts            id, user_id → users, provider, provider_account_id (OAuth)
+projects            id, user_id → users, name, type, status, interview_data (JSONB), deleted_at
+documentation_bundles  id, project_id → projects, domain_id, content
+user_api_keys       id, user_id → users, provider, key_hash (AES encrypted), masked_key
+```
+
+### `interview_data` JSONB shape
+```ts
+{
+  lockedContext:       ProjectContext,
+  lockedChoices:       Record<DomainId, Record<string, string>>,
+  completedDomains:    DomainId[],
+  domainContent:       Record<DomainId, string>,
+  conversationHistory: ChatMessage[],
+  elaboration:         string,
+  schemaTables:        SchemaTables,
+  schemaConfirmed:     boolean,
+}
+```
+This mirrors `InterviewData` in `packages/shared/src/types.ts`.
+
+### Migrations
+- Dev: `pnpm drizzle-kit push` — applies schema changes directly. Fast, no files.
+- Prod: `pnpm drizzle-kit generate` → commit the SQL file → run in CI.
+- Never write raw SQL migrations by hand. Always go through Drizzle.
+- Soft deletes only — use `deleted_at` timestamp. Never hard-delete projects.
+
+### Redis key conventions
+```
+ratelimit:{userId}:{method}:{path}     Rate limit counter (TTL = window seconds)
+ai:doc:{projectId}:{domainId}          Cached AI doc section (TTL = 86400s / 24h)
+```
+
+---
+
+## Testing the interview end-to-end (no API key required)
+
+The mock streaming in `apps/web/lib/interview/store.ts` lets you run the full
+interview without a real API key. The `streamAIResponse` mock sends a
+word-by-word stream of the opener/doc text. This is intentional — it makes
+local development fast.
+
+To switch to real AI:
+1. Add your Anthropic or OpenAI key via Settings → API Key
+2. The store calls `getActiveConfig()` before every reply — if a key is found,
+   it uses the real SDK; the mock is only used when no key is configured
+
+---
+
+## Common tasks
+
+### Add a new settings section
+1. Add the section ID to `SettingsSection` type in `components/settings/SettingsSidebar.tsx`
+2. Create `components/settings/YourSection.tsx` following the same Card/Field/PageHeader pattern
+3. Add the route condition in `app/(app)/settings/page.tsx`
+4. Add the sidebar item in `SettingsSidebar.tsx`
+
+### Add a new API endpoint
+1. Create or update the route file in `apps/api/src/routes/`
+2. Add a Zod schema for the request body in `packages/shared/src/schemas.ts`
+3. Use `validateBody(YourSchema)` middleware in the route
+4. Mount the router in `apps/api/src/index.ts`
+5. Add the endpoint to the route structure table in this file
+
+### Add a new page to apps/web
+1. Create the file at the correct path under `app/(app)/` or `app/(auth)/`
+2. Add `"use client"` at the top if it uses hooks or browser APIs
+3. Update `middleware.ts` if the route has different auth requirements
+4. Update the `<Navbar active="...">` prop if it's a top-level nav page
+
+### Change the AI system prompt
+Edit `buildSystemPrompt()` in `packages/shared/src/prompts.ts` only.
+The function is used by both `apps/web` (mock) and `apps/api` (real).
+Test with the mock first (no API cost), then verify with a real key.
+
+---
+
+## What not to do
+
+- **Never call the Anthropic or OpenAI SDK directly in a component.** All AI
+  calls go through `lib/interview/store.ts` → `lib/ai/stream.ts`. This keeps
+  streaming state, error handling, and AbortController management in one place.
+
+- **Never import from `apps/web` inside `apps/api` or vice versa.** Shared code
+  belongs in `packages/shared`. Cross-app imports will break the build pipeline.
+
+- **Never use `localStorage` for API keys in new code.** Pre-Phase 5 the web app
+  does this, but all new key handling goes through `POST /keys` to the Express
+  server. The localStorage path is technical debt being retired.
+
+- **Never use `dangerouslySetInnerHTML` with unsanitised user content.** The four
+  existing uses (`PreviewPanel`, `DocPreview`, `DocList`, `ChatPanel`) are on the
+  roadmap to be replaced with `react-markdown` + `rehype-sanitize` (see
+  `CLAUDE_CODE_PROMPTS.md` Prompt 10).
+
+- **Never add `shadow-*` classes.** Vellum uses borders for depth, not shadows.
+  The one exception is `shadow-2xl` on modal overlay cards.
+
+- **Never use `px` values for colours** — always reference CSS custom properties
+  or Tailwind tokens. Hardcoded hex in JSX is only acceptable for inline styles
+  where Tailwind doesn't reach (e.g. `style={{ background: "#fdf2f2" }}`).
+
+- **Never modify `DOMAINS` order in `lib/interview/domains.ts`.** The order
+  determines interview progression. Adding domains should append to the end
+  unless there's a strong product reason to reorder, in which case also update
+  all test fixtures and seed data.
+
+- **Never break the middleware.ts route protection rules.** Protected prefixes:
+  `/dashboard`, `/project`, `/settings`, `/docs`. Public: `/`, `/login`,
+  `/signup`, `/forgot-password`, `/auth/*`. Changing this requires updating
+  both `apps/web/middleware.ts` AND the Better Auth config in `apps/api/src/lib/auth.ts`.
+
+---
+
+## Pending work (do not implement without a prompt file)
+
+The following features are specced but not yet built. Reference the
+corresponding prompt file before starting work on any of them.
+
+| Feature | Prompt file | Status |
+|---|---|---|
+| Better Auth wiring in apps/web | `PROMPT_MIGRATION.md` Phase 4 | Pending |
+| AI streaming moved to apps/api | `PROMPT_MIGRATION.md` Phase 5 | Pending |
+| TanStack Query for server state | `PROMPT_MIGRATION.md` Phase 6 | Pending |
+| Amazon Bedrock provider | `PROMPT_02_BEDROCK.md` | Pending |
+| Error states + timeout handling | `CLAUDE_CODE_PROMPTS.md` Prompt 4 | Pending |
+| Domain skipping by project type | `CLAUDE_CODE_PROMPTS.md` Prompt 5 | Pending |
+| Inline document editing | `CLAUDE_CODE_PROMPTS.md` Prompt 6 | Pending |
+| ZIP export | `CLAUDE_CODE_PROMPTS.md` Prompt 7 | Pending |
+| Cmd+K search | `CLAUDE_CODE_PROMPTS.md` Prompt 9 | Pending |
+| react-markdown + XSS safety | `CLAUDE_CODE_PROMPTS.md` Prompt 10 | Pending |
+| Global toast provider | `CLAUDE_CODE_PROMPTS.md` Prompt 11 | Pending |
+| Mobile responsive layout | `CLAUDE_CODE_PROMPTS.md` Prompt 12 | Pending |
+| Templates page | `CLAUDE_CODE_PROMPTS.md` Prompt 13 | Pending |
+| Loading skeletons | `CLAUDE_CODE_PROMPTS.md` Prompt 14 | Pending |
+
+---
+
+## Deployment
+
+### apps/web → Vercel
+- Framework preset: Next.js
+- Build command: `pnpm --filter @devdocs/web build`
+- Output directory: `apps/web/.next`
+- Root directory: leave blank (Vercel detects Turborepo automatically)
+- Environment variables: all `NEXT_PUBLIC_*` vars
+
+### apps/api → Railway
+- Start command: `node dist/index.js`
+- Build command: `pnpm --filter @devdocs/api build`
+- Environment variables: all API vars (DATABASE_URL, UPSTASH_*, SESSION_SECRET,
+  ENCRYPTION_KEY, GOOGLE_*, GITHUB_*, WEB_URL, PORT)
+
+### OAuth callback URLs to register before going live
+- Google Console: `https://api.yourdomain.com/auth/callback/google`
+- GitHub OAuth App: `https://api.yourdomain.com/auth/callback/github`
+
+### CI (GitHub Actions)
+`.github/workflows/ci.yml` runs on every push and PR:
+- `pnpm typecheck` — TypeScript across all packages
+- `pnpm --filter @devdocs/web lint` — ESLint on apps/web
+- `pnpm --filter @devdocs/web build` — Next.js build check
+
+Merging to `main` without a green CI run is not permitted.
