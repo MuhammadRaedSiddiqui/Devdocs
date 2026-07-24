@@ -5,7 +5,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
 import { StatStrip } from "@/components/dashboard/StatStrip";
 import { ProjectCard } from "@/components/dashboard/ProjectCard";
-import { CreateProjectFlow } from "@/components/dashboard/CreateProjectFlow";
+import { CreateProjectModal } from "@/components/dashboard/CreateProjectModal";
 import type { Project, ProjectType } from "@/lib/types";
 import { trpc } from "@/lib/trpc";
 
@@ -84,7 +84,7 @@ export default function DashboardPage() {
           )}
         </main>
       </div>
-      <CreateProjectFlow open={modalOpen} onClose={()=>setModalOpen(false)} onCreate={handleCreate} />
+      <CreateProjectModal open={modalOpen} onClose={()=>setModalOpen(false)} onCreate={handleCreate} />
     </div>
   );
 }
