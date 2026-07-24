@@ -65,7 +65,7 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
     if (config) store.setProvider(config.provider);
     hasHydrated.current = true;
     setHydrated(true);
-  }, [projectQuery.data]);
+  }, [projectQuery.data, getToken, params.id, store]);
 
   // Persist only stable interview content. Streaming and UI-only state is
   // deliberately excluded, and a debounce avoids one request per keystroke.
