@@ -19,6 +19,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@anthropic-ai/bedrock-sdk": "^0.32.0",
     "@anthropic-ai/sdk": "^0.27.3",
     "@clerk/express": "^2.1.43",
     "@devdocs/shared": "workspace:*",

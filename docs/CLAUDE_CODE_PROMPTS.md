@@ -4,7 +4,7 @@
 
 ---
 
-## 1. WIRE THE REAL ANTHROPIC AI (unlocks everything)
+## 1. WIRE THE REAL ANTHROPIC AI (unlocks everything) ✅ DONE
 
 You are working on DevDocs AI — a Next.js 14 App Router project that interviews
 developers before they start coding and generates a 10-file documentation bundle.
@@ -47,7 +47,7 @@ of `streamAIResponse()`. The store's `runReply()` and `runOpener()` helpers call
 
 ---
 
-## 2. AUTH FLOW — SIGNUP, SESSION, PROTECTED ROUTES
+## 2. AUTH FLOW — SIGNUP, SESSION, PROTECTED ROUTES ✅ DONE (migrated to Clerk)
 
 You are working on DevDocs AI — a Next.js 14 App Router project.
 Supabase is the auth provider. The login page exists at `app/(auth)/login/page.tsx`
@@ -102,7 +102,7 @@ Keep all visual styles unchanged — this is purely a wiring task.
 
 ---
 
-## 3. PERSIST INTERVIEW STATE TO SUPABASE
+## 3. PERSIST INTERVIEW STATE TO SUPABASE ✅ DONE (migrated to tRPC + Drizzle)
 
 You are working on DevDocs AI — a Next.js 14 App Router project.
 The Zustand interview store (`lib/interview/store.ts`) has a no-op
@@ -156,7 +156,7 @@ Requirements:
 
 ---
 
-## 4. ERROR STATES AND TIMEOUT HANDLING
+## 4. ERROR STATES AND TIMEOUT HANDLING ✅ DONE
 
 You are working on DevDocs AI — a Next.js 14 App Router project.
 The interview store (`lib/interview/store.ts`) calls the Anthropic API via
@@ -196,7 +196,7 @@ Requirements:
 
 ---
 
-## 5. DOMAIN SKIPPING BY PROJECT TYPE
+## 5. DOMAIN SKIPPING BY PROJECT TYPE ✅ DONE
 
 You are working on DevDocs AI — a Next.js 14 App Router project.
 The interview always runs all 10 domains regardless of project type. A landing
@@ -235,7 +235,7 @@ Requirements:
 
 ---
 
-## 6. INLINE DOCUMENT EDITING AFTER COMPLETION
+## 6. INLINE DOCUMENT EDITING AFTER COMPLETION ✅ DONE
 
 You are working on DevDocs AI — a Next.js 14 App Router project.
 After the interview completes, `components/interview/PreviewPanel.tsx` slides in
@@ -277,7 +277,7 @@ Requirements:
 
 ---
 
-## 7. ZIP EXPORT (10 SEPARATE FILES)
+## 7. ZIP EXPORT (10 SEPARATE FILES) ✅ DONE
 
 You are working on DevDocs AI — a Next.js 14 App Router project.
 The landing page and pricing section both advertise "ZIP export" as a free-tier
@@ -332,7 +332,7 @@ Requirements:
 
 ---
 
-## 8. ROUTE PROTECTION (MIDDLEWARE)
+## 8. ROUTE PROTECTION (MIDDLEWARE) ✅ DONE (Clerk middleware)
 
 You are working on DevDocs AI — a Next.js 14 App Router project using Supabase
 for auth. There is currently no middleware — all routes are publicly accessible.
@@ -365,49 +365,18 @@ Requirements:
 
 ---
 
-## 9. CMD+K SEARCH
+## 9. CMD+K SEARCH ✅ DONE
 
 You are working on DevDocs AI — a Next.js 14 App Router project.
 The "⌘K — Search projects" button in `components/layout/Navbar.tsx` is
 currently decorative (no `onClick` handler). The button is already correctly
 positioned and styled.
 
-Task: Wire the Cmd+K button to a functional project search modal.
 
-Requirements:
-1. Create `components/layout/SearchModal.tsx`:
-   - A full-screen overlay (`fixed inset-0 bg-ink/40 z-50`) with a centered
-     modal card (max-width 560px, same `bg-vellum-white border border-parchment
-     rounded-vellum shadow-xl` style as CreateProjectModal).
-   - A search input at the top, autofocused when the modal opens.
-     Placeholder: "Search projects and documents..."
-   - Below the input, two sections with `text-[10px] uppercase tracking-wider
-     text-ink-faint` labels: "Projects" and "Documents".
-   - Each result row: icon (project type badge or file type indicator) + name +
-     right-side metadata (last modified or domain label). Clicking a result
-     navigates to the relevant page and closes the modal.
-   - Empty state: "No results for '...'" with a subtle `text-ink-faint` message.
-   - Filter logic: fuzzy-match (simple `includes`) against project names,
-     project types, document filenames, and domain labels.
-   - Keyboard: `↑` / `↓` to move selection, `Enter` to navigate to the
-     selected result, `Escape` to close.
-
-2. Update `components/layout/Navbar.tsx`:
-   - Add `useState` for `searchOpen`.
-   - The "⌘K" button's `onClick` sets `searchOpen(true)`.
-   - Add a `useEffect` that listens for `Cmd+K` / `Ctrl+K` globally
-     (prevent default, open modal).
-   - Render `<SearchModal open={searchOpen} onClose={()=>setSearchOpen(false)} projects={...} docs={...}/>`.
-   - Pass `MOCK_PROJECTS` and `buildLibraryDocs()` as props for now — swap
-     for real Supabase data once task 3 is complete.
-
-3. The modal should close on outside click (clicking the overlay) and on
-   `Escape`. Do not use any external dependency — implement focus management
-   and keyboard handling directly.
 
 ---
 
-## 10. REACT-MARKDOWN AND XSS SAFETY
+## 10. REACT-MARKDOWN AND XSS SAFETY ✅ DONE
 
 You are working on DevDocs AI — a Next.js 14 App Router project.
 Four components use `dangerouslySetInnerHTML` with a hand-rolled markdown
@@ -451,7 +420,7 @@ Requirements:
 
 ---
 
-## 11. GLOBAL TOAST PROVIDER
+## 11. GLOBAL TOAST PROVIDER ✅ DONE
 
 You are working on DevDocs AI — a Next.js 14 App Router project.
 Toast notifications are currently re-implemented on every page as
@@ -459,41 +428,11 @@ Toast notifications are currently re-implemented on every page as
 and the interview page). Two toasts cannot coexist, and the implementation
 is duplicated across three files.
 
-Task: Replace all per-page toast state with a single global toast provider.
 
-Requirements:
-1. Create `lib/toast.tsx`:
-   - A React context + provider with a queue (array of `{ id: string; message: string; type: "success" | "error" | "info" }`).
-   - Export `useToast()` hook that returns `{ toast(message, type?) }`.
-   - Toasts auto-dismiss after 2200ms. Multiple toasts stack vertically
-     (max 3 visible at once — oldest dismisses first if a 4th arrives).
-
-2. Create `components/ui/ToastStack.tsx`:
-   - Renders the active toast queue at `fixed bottom-5 right-5 z-50 flex flex-col gap-2`.
-   - Each toast: `bg-ink text-vellum text-xs px-4 py-2 rounded-lg` with an
-     optional left-border colour: green for success, terracotta for error,
-     no border for info.
-   - Animate in with a subtle slide-up + fade (CSS `@keyframes`, no external
-     animation library needed).
-   - Each toast has an `×` dismiss button on the right.
-
-3. Update the root layout (`app/layout.tsx`) to wrap children with
-   `<ToastProvider>` and render `<ToastStack/>` inside it.
-
-4. Remove the per-page `useState<string|null>` toast implementations and their
-   corresponding conditional `<div>` renders from:
-   - `app/(app)/settings/page.tsx`
-   - `app/(app)/dashboard/page.tsx`
-   - Any other pages that have the pattern.
-
-5. Replace all `showToast(msg)` and `onToast(msg)` prop-drilling with direct
-   `const { toast } = useToast()` calls at the component level. This removes
-   the `onToast` prop from `AccountSection`, `ApiKeySection`, and `PrivacySection`
-   entirely.
 
 ---
 
-## 12. MOBILE RESPONSIVE LAYOUT
+## 12. MOBILE RESPONSIVE LAYOUT ✅ DONE
 
 You are working on DevDocs AI — a Next.js 14 App Router project.
 The interview page (`app/(app)/project/[id]/interview/page.tsx`) uses a fixed
@@ -537,7 +476,7 @@ Requirements:
 
 ---
 
-## 13. TEMPLATES PAGE
+## 13. TEMPLATES PAGE ✅ DONE
 
 You are working on DevDocs AI — a Next.js 14 App Router project.
 The "Templates" nav link in `components/layout/Navbar.tsx` links to `/templates`
@@ -575,7 +514,7 @@ Requirements:
 
 ---
 
-## 14. LOADING SKELETON FOR THE INTERVIEW PAGE
+## 14. LOADING SKELETON FOR THE INTERVIEW PAGE ✅ DONE
 
 You are working on DevDocs AI — a Next.js 14 App Router project.
 `app/(app)/project/[id]/interview/page.tsx` currently returns `null` while the

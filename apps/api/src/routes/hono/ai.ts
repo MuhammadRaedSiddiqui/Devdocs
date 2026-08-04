@@ -1,19 +1,44 @@
 import { Hono } from 'hono';
 import { and, eq } from 'drizzle-orm';
-import { StreamRequestSchema, buildSystemPrompt, type AIProvider } from '@devdocs/shared';
+import { StreamRequestSchema, buildSystemPrompt, PROVIDER_MODELS, type AIProvider } from '@devdocs/shared';
 import { db, documentationBundles, projects } from '../../lib/db';
 import { streamAIResponse } from '../../lib/aiStream';
 import { checkRateLimit } from '../../lib/rateLimit';
 import { requireClerkAuth } from '../../middleware/hono-clerk-auth';
 import { loadDecryptedKey } from './keys';
+import { anthropicEndpointHost, getAnthropicEndpoint } from '../../lib/anthropicConfig';
 
-const models: Record<AIProvider, string> = { anthropic: 'claude-sonnet-4-6', openai: 'gpt-4o' };
+const models: Record<Exclude<AIProvider, 'anthropic'>, string> = {
+  openai: 'gpt-4o',
+  bedrock: process.env.AWS_BEDROCK_MODEL ?? PROVIDER_MODELS.bedrock.default,
+};
 
 // Per-user/provider AI generation limit: 20 requests per minute.
 const AI_RATE_LIMIT = 20;
 const AI_RATE_WINDOW_SEC = 60;
 
 const app = new Hono();
+
+app.get('/bedrock-status', (c) => {
+  const configured = !!(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY);
+  return c.json({
+    configured,
+    region: configured ? (process.env.AWS_REGION ?? 'us-east-1') : null,
+    model: configured ? (process.env.AWS_BEDROCK_MODEL ?? PROVIDER_MODELS.bedrock.default) : null,
+  });
+});
+
+app.get('/anthropic-status', (c) => {
+  const endpoint = getAnthropicEndpoint();
+  return c.json({
+    // True when ANTHROPIC_AUTH_TOKEN is set — users don't need their own key.
+    serverManaged: endpoint.serverManaged,
+    // Hostname only; the full URL may embed a path or private routing details.
+    host: anthropicEndpointHost(endpoint.baseURL),
+    model: endpoint.serverManaged ? endpoint.model : null,
+  });
+});
+
 app.use('*', requireClerkAuth);
 
 app.post('/stream', async (c) => {
@@ -37,10 +62,35 @@ app.post('/stream', async (c) => {
     );
   }
 
-  const apiKey = await loadDecryptedKey(userId, provider);
-  if (!apiKey) return c.json({ error: 'no_key', message: `No ${provider} API key found.` }, 400);
-  const data = (project.interviewData ?? {}) as Record<string, unknown>;
-  if (!data.lockedContext) return c.json({ error: 'invalid_project', message: 'Complete project discovery first.' }, 400);
+  const anthropic = getAnthropicEndpoint();
+  let apiKey: string;
+  let model: string;
+  if (provider === "bedrock") {
+    if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
+      return c.json({ error: 'bedrock_not_configured', message: 'Amazon Bedrock is not configured on this server.' }, 400);
+    }
+    apiKey = "bedrock-env";
+    model = models.bedrock;
+  } else if (provider === "anthropic" && anthropic.serverManaged) {
+    // A server-side bearer token authenticates every user — no stored key needed.
+    apiKey = "";
+    model = anthropic.model;
+  } else {
+    const key = await loadDecryptedKey(userId, provider);
+    if (!key) return c.json({ error: 'no_key', message: `No ${provider} API key found.` }, 400);
+    apiKey = key;
+    model = provider === "anthropic" ? anthropic.model : models.openai;
+  }
+  let data = (project.interviewData ?? {}) as Record<string, unknown>;
+  if (!data.lockedContext) {
+    // Race condition: client may have just saved lockedContext — retry once after a brief wait
+    await new Promise(r => setTimeout(r, 1500));
+    const retry = await db.query.projects.findFirst({
+      where: and(eq(projects.id, projectId), eq(projects.userId, userId)),
+    });
+    data = ((retry?.interviewData ?? {}) as Record<string, unknown>);
+    if (!data.lockedContext) return c.json({ error: 'invalid_project', message: 'Complete project discovery first.' }, 400);
+  }
 
   const encoder = new TextEncoder();
   const abort = new AbortController();
@@ -54,7 +104,13 @@ app.post('/stream', async (c) => {
       const close = () => { if (!closed) { closed = true; controller.close(); } };
       const timeout = setTimeout(() => { abort.abort(); send({ type: 'error', errorType: 'timeout', message: 'Request timed out after 30 seconds.' }); close(); }, 30_000);
       const prompt = buildSystemPrompt(data.lockedContext as Parameters<typeof buildSystemPrompt>[0], domainId, (data.elaboration as string) ?? '', (data.lockedChoices as Parameters<typeof buildSystemPrompt>[3]) ?? {});
-      streamAIResponse(prompt, userMessage, { provider, apiKey, model: models[provider] }, {
+      streamAIResponse(prompt, userMessage, {
+        provider,
+        apiKey,
+        model,
+        // Ignored by every provider except Anthropic.
+        ...(provider === 'anthropic' ? { baseURL: anthropic.baseURL, authToken: anthropic.authToken } : {}),
+      }, {
         onToken: (text) => send({ type: 'token', text }),
         onDone: async (text) => {
           clearTimeout(timeout);

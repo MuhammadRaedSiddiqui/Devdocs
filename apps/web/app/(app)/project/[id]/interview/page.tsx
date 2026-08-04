@@ -5,8 +5,9 @@ import { DiscoveryForm } from "@/components/interview/DiscoveryForm";
 import { DomainProgress } from "@/components/interview/DomainProgress";
 import { ChatPanel } from "@/components/interview/ChatPanel";
 import { PreviewPanel } from "@/components/interview/PreviewPanel";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { InterviewSkeleton } from "@/components/interview/InterviewSkeleton";
 import { useInterviewStore } from "@/lib/interview/store";
-import { DOMAINS } from "@/lib/interview/domains";
 import { getActiveConfig } from "@/lib/ai/provider";
 import { setAISession } from "@/lib/ai/provider";
 import { trpc } from "@/lib/trpc";
@@ -32,13 +33,13 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
   const { getToken } = useAuth();
   const [hydrated, setHydrated] = useState(false);
   const hasHydrated = useRef(false);
+  const [domainsSheet, setDomainsSheet] = useState(false);
+  const [previewSheet, setPreviewSheet] = useState(false);
   const projectQuery = trpc.projects.get.useQuery({ id: params.id });
   const saveInterview = trpc.projects.update.useMutation();
 
-  const pct = Math.round(store.completedDomains.length / DOMAINS.length * 100);
+  const pct = Math.round(store.completedDomains.length / store.activeDomains.length * 100);
 
-  // Hydrate once per project. Resetting prevents Zustand state from a
-  // previously visited project appearing while this project's data loads.
   useEffect(() => {
     hasHydrated.current = false;
     setHydrated(false);
@@ -50,16 +51,30 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
 
     const saved = readSavedInterviewData(projectQuery.data.interviewData);
     if (saved?.lockedContext) {
-      store.resumeFromSaved({
-        lockedContext: saved.lockedContext,
-        lockedChoices: saved.lockedChoices ?? {},
-        completedDomains: saved.completedDomains ?? [],
-        domainContent: saved.domainContent ?? {},
-        conversationHistory: saved.conversationHistory ?? [],
-        elaboration: saved.elaboration ?? "",
-      });
+      const hasHistory = (saved.conversationHistory ?? []).length > 0;
+      if (hasHistory) {
+        store.resumeFromSaved({
+          lockedContext: saved.lockedContext,
+          lockedChoices: saved.lockedChoices ?? {},
+          completedDomains: saved.completedDomains ?? [],
+          domainContent: saved.domainContent ?? {},
+          conversationHistory: saved.conversationHistory ?? [],
+          elaboration: saved.elaboration ?? "",
+        });
+      } else {
+        store.resumeFromSaved({
+          lockedContext: saved.lockedContext,
+          lockedChoices: saved.lockedChoices ?? {},
+          completedDomains: [],
+          domainContent: {},
+          conversationHistory: [],
+          elaboration: saved.elaboration ?? "",
+        });
+        store.setLockedContext(saved.lockedContext);
+      }
     }
 
+    store.setProjectName(projectQuery.data.name);
     setAISession(params.id, getToken);
     const config = getActiveConfig();
     if (config) store.setProvider(config.provider);
@@ -67,12 +82,15 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
     setHydrated(true);
   }, [projectQuery.data]);
 
-  // Persist only stable interview content. Streaming and UI-only state is
-  // deliberately excluded, and a debounce avoids one request per keystroke.
+  const hasSavedContext = useRef(false);
   useEffect(() => {
     if (!hydrated || !store.lockedContext || saveInterview.isPending) return;
 
+    const isFirstContextSave = !hasSavedContext.current && !!store.lockedContext;
+    const delay = isFirstContextSave ? 0 : 750;
+
     const timeout = window.setTimeout(() => {
+      if (isFirstContextSave) hasSavedContext.current = true;
       saveInterview.mutate({
         id: params.id,
         data: {
@@ -88,7 +106,7 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
           },
         },
       });
-    }, 750);
+    }, delay);
 
     return () => window.clearTimeout(timeout);
   }, [
@@ -105,7 +123,7 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
   ]);
 
   if (projectQuery.isLoading || !hydrated) {
-    return <div className="min-h-screen grid place-items-center text-sm text-ink-muted">Loading project...</div>;
+    return <InterviewSkeleton />;
   }
 
   if (projectQuery.error || !projectQuery.data) {
@@ -116,17 +134,17 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      <header className="h-[52px] border-b border-vellum-border bg-vellum flex items-center px-7 gap-2.5 flex-shrink-0">
+      <header className="h-[52px] border-b border-vellum-border bg-vellum flex items-center px-4 md:px-7 gap-2.5 flex-shrink-0">
         <span className="font-serif-heading text-[17px] text-ink">DevDocs AI</span>
-        <span className="text-[13px] text-ink-muted">{projectQuery.data.name}</span>
+        <span className="text-[13px] text-ink-muted hidden sm:inline">{projectQuery.data.name}</span>
         <div className="ml-auto flex items-center gap-2">
           {store.currentProvider && (
-            <span className="text-[11px] px-2.5 py-1 rounded-full border border-vellum-border text-ink-faint bg-white">
+            <span className="text-[11px] px-2.5 py-1 rounded-full border border-vellum-border text-ink-faint bg-white hidden sm:inline">
               {store.currentProvider === "anthropic" ? "Anthropic" : "OpenAI"}
             </span>
           )}
           <span className="text-[11px] px-3 py-1 rounded-full font-medium bg-[#ccdbe8] text-[#0c447c]">
-            {pct}% complete
+            {pct}%
           </span>
         </div>
       </header>
@@ -136,11 +154,56 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
           <DiscoveryForm projectType={projectType} onSubmit={store.setLockedContext} />
         </div>
       ) : (
-        <div className="flex flex-row h-[calc(100vh-52px)] overflow-hidden">
-          <DomainProgress />
-          <ChatPanel />
-          <PreviewPanel />
-        </div>
+        <>
+          {/* Desktop: three-panel layout */}
+          <div className="hidden md:flex flex-row h-[calc(100vh-52px)] overflow-hidden">
+            <DomainProgress />
+            <ChatPanel />
+            <PreviewPanel />
+          </div>
+
+          {/* Mobile: chat only + bottom nav */}
+          <div className="flex md:hidden flex-col h-[calc(100vh-52px-56px)] overflow-hidden">
+            <ChatPanel />
+          </div>
+
+          {/* Mobile bottom navigation */}
+          <div className="md:hidden h-14 border-t border-vellum-border bg-vellum flex items-center justify-around flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => setDomainsSheet(true)}
+              className="flex flex-col items-center gap-0.5 text-ink-muted"
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-ink-muted">
+                <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+              <span className="text-[10px]">Domains</span>
+            </button>
+            {store.isComplete && (
+              <button
+                type="button"
+                onClick={() => setPreviewSheet(true)}
+                className="flex flex-col items-center gap-0.5 text-ink-muted"
+              >
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-ink-muted">
+                  <path d="M4 3h8l4 4v10a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M12 3v4h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <span className="text-[10px]">Document</span>
+              </button>
+            )}
+          </div>
+
+          {/* Bottom sheets for mobile */}
+          <BottomSheet open={domainsSheet} onClose={() => setDomainsSheet(false)} title="Interview Progress">
+            <DomainProgress />
+          </BottomSheet>
+          {store.isComplete && (
+            <BottomSheet open={previewSheet} onClose={() => setPreviewSheet(false)} title="DOCUMENTATION.md">
+              <PreviewPanel />
+            </BottomSheet>
+          )}
+        </>
       )}
     </div>
   );

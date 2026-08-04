@@ -74,7 +74,7 @@ export interface InterviewData {
 }
 
 // ── AI provider types (shared between web settings UI and API key vault) ──────
-export type AIProvider = "anthropic" | "openai";
+export type AIProvider = "anthropic" | "openai" | "bedrock";
 
 export interface AIProviderConfig {
   provider: AIProvider;
@@ -83,9 +83,17 @@ export interface AIProviderConfig {
 }
 
 export const PROVIDER_MODELS: Record<AIProvider, { default: string; label: string }> = {
-  anthropic: { default: "claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
-  openai:    { default: "gpt-4o",             label: "GPT-4o" },
+  anthropic: { default: "claude-sonnet-4-6",                        label: "Claude Sonnet 4.6" },
+  openai:    { default: "gpt-4o",                                    label: "GPT-4o" },
+  bedrock:   { default: "us.anthropic.claude-sonnet-4-5-20250929-v1:0", label: "Claude via Bedrock" },
 };
+
+export const BEDROCK_MODELS: { id: string; label: string }[] = [
+  { id: "anthropic.claude-sonnet-4-5-20251001-v1:0", label: "Claude Sonnet 4.5" },
+  { id: "anthropic.claude-haiku-4-5-20251001-v1:0",  label: "Claude Haiku 4.5" },
+  { id: "anthropic.claude-3-5-sonnet-20241022-v2:0", label: "Claude 3.5 Sonnet" },
+  { id: "anthropic.claude-3-5-haiku-20241022-v1:0",  label: "Claude 3.5 Haiku" },
+];
 
 export const PROJECT_TYPE_LABELS: Record<ProjectType, string> = {
   saas:          "SaaS product",

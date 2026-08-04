@@ -6,7 +6,8 @@ import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
 import { StatStrip } from "@/components/dashboard/StatStrip";
 import { ProjectCard } from "@/components/dashboard/ProjectCard";
 import { CreateProjectModal } from "@/components/dashboard/CreateProjectModal";
-import type { Project, ProjectType } from "@/lib/types";
+import { buildProjectZip } from "@/lib/export/buildZip";
+import type { Project, ProjectContext, ProjectType, DomainId } from "@/lib/types";
 import { trpc } from "@/lib/trpc";
 
 const LIMIT = 3;
@@ -19,10 +20,11 @@ export default function DashboardPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const projectsQuery = trpc.projects.list.useQuery();
   const utils = trpc.useUtils();
+  const [navigating, setNavigating] = useState(false);
   const createProject = trpc.projects.create.useMutation({
     onSuccess: (project) => {
       utils.projects.list.invalidate();
-      setModalOpen(false);
+      setNavigating(true);
       router.push(`/project/${project.id}/interview`);
     },
   });
@@ -39,11 +41,28 @@ export default function DashboardPage() {
 
   function handleTypeFilter(t: string) { setTypeFilter(c => c === t ? null : t); setStatusFilter("all"); }
   function handleDelete(id: string) { deleteProject.mutate({ id }); }
-  function handleDownload(p: Project) {
-    const blob = new Blob([`# ${p.name}\n\n${p.description}`], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `${p.name.replace(/\s+/g,"-").toLowerCase()}.md`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  async function handleDownload(p: Project) {
+    try {
+      const full = await utils.projects.get.fetch({ id: p.id });
+      const data = full.interviewData as { lockedContext?: ProjectContext; domainContent?: Partial<Record<DomainId, string>> } | null;
+      if (data?.lockedContext && data?.domainContent) {
+        const blob = await buildProjectZip(data.lockedContext, data.domainContent);
+        const slug = p.name.replace(/\s+/g, "-").toLowerCase();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a"); a.href = url; a.download = `${slug}-docs.zip`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+      } else {
+        const blob = new Blob([`# ${p.name}\n\n${p.description}`], { type: "text/markdown" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a"); a.href = url; a.download = `${p.name.replace(/\s+/g, "-").toLowerCase()}.md`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+      }
+    } catch {
+      const blob = new Blob([`# ${p.name}\n\n${p.description}`], { type: "text/markdown" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = url; a.download = `${p.name.replace(/\s+/g, "-").toLowerCase()}.md`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    }
   }
   function handleCreate(name: string, type: ProjectType) {
     createProject.mutate({ name, type });
@@ -58,7 +77,6 @@ export default function DashboardPage() {
         <DashboardSidebar projects={projects} statusFilter={statusFilter} typeFilter={typeFilter} onStatusFilter={s=>{setStatusFilter(s);setTypeFilter(null);}} onTypeFilter={handleTypeFilter} onNewProject={()=>setModalOpen(true)} projectsUsed={projects.length} projectsLimit={LIMIT} />
         <main className="flex-1 overflow-y-auto px-8 py-7">
           <StatStrip projects={projects} projectsLimit={LIMIT} />
-          {projectsQuery.isLoading && <div className="mb-4 text-sm text-ink-muted">Loading projects...</div>}
           {projectsQuery.error && <div className="mb-4 text-sm text-danger">Unable to load projects. Please refresh and try again.</div>}
           <div className="flex items-center justify-between mb-3.5">
             <div className="text-[11px] font-medium uppercase tracking-wider text-ink-faint">{label} — {list.length}</div>
@@ -68,7 +86,13 @@ export default function DashboardPage() {
               ))}
             </div>
           </div>
-          {list.length === 0 ? (
+          {projectsQuery.isLoading ? (
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
+              {Array.from({ length: 4 }, (_, i) => (
+                <div key={i} className="bg-vellum-border-light animate-pulse rounded-vellum min-h-[152px]" />
+              ))}
+            </div>
+          ) : list.length === 0 ? (
             <div className="py-16 text-center text-ink-faint">
               <div className="text-3xl mb-3">○</div>
               <div className="font-serif-heading text-base text-ink mb-1.5">Nothing here yet</div>
@@ -84,7 +108,7 @@ export default function DashboardPage() {
           )}
         </main>
       </div>
-      <CreateProjectModal open={modalOpen} onClose={()=>setModalOpen(false)} onCreate={handleCreate} />
+      <CreateProjectModal open={modalOpen} onClose={()=>setModalOpen(false)} onCreate={handleCreate} creating={createProject.isPending || navigating} />
     </div>
   );
 }
