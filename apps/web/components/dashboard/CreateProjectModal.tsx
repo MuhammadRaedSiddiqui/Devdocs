@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import type { ProjectType } from "@/lib/types";
-import { type AIProvider, ACTIVE_PROVIDER_KEY, fetchAnthropicStatus } from "@/lib/ai/provider";
+import { type AIProvider, ACTIVE_PROVIDER_KEY } from "@/lib/ai/provider";
 import { fetchKeys, saveKey } from "@/lib/ai/keys";
 
 interface Props {
@@ -51,14 +51,9 @@ export function CreateProjectModal({ open, onClose, onCreate, creating }: Props)
     let cancelled = false;
     (async () => {
       try {
-        // A server-managed Anthropic endpoint satisfies the key requirement on
-        // its own — the user never has to supply one.
-        const [keys, anthropic] = await Promise.all([
-          fetchKeys(getToken),
-          fetchAnthropicStatus(),
-        ]);
+        const keys = await fetchKeys(getToken);
         if (cancelled) return;
-        setHasKey(keys.length > 0 || anthropic.serverManaged);
+        setHasKey(keys.length > 0);
       } catch {
         if (!cancelled) setHasKey(false);
       } finally {

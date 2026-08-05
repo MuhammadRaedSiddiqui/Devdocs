@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/lib/toast";
 
 export function PageHeader({title,sub}:{title:string;sub:string}) {
   return <div className="mb-6"><div className="font-serif-heading text-2xl text-ink mb-1">{title}</div><div className="text-[13px] text-ink-muted">{sub}</div></div>;
@@ -20,7 +21,8 @@ export function Field({label,children}:{label:string;children:React.ReactNode}) 
   return <div className="mb-3.5"><label className="block text-[12.5px] font-medium text-ink mb-1.5">{label}</label>{children}</div>;
 }
 
-export function AccountSection({onToast}:{onToast:(m:string)=>void}) {
+export function AccountSection() {
+  const { toast } = useToast();
   const [showPw,setShowPw]=useState(false);
   const [name,setName]=useState("Ahmad");
   return (
@@ -39,7 +41,7 @@ export function AccountSection({onToast}:{onToast:(m:string)=>void}) {
           </div>
           <div className="text-[11px] text-ink-faint mt-1.5">Email is managed by your account provider and can&apos;t be changed here.</div>
         </Field>
-        <button type="button" onClick={()=>onToast("Display name saved")} className="px-4 py-1.5 bg-ink text-vellum rounded-lg text-xs font-medium mt-1">Save changes</button>
+        <button type="button" onClick={()=>toast("Display name saved")} className="px-4 py-1.5 bg-ink text-vellum rounded-lg text-xs font-medium mt-1">Save changes</button>
       </Card>
       <Card title="Security" sub="Manage your password and active sessions.">
         {showPw?(
@@ -48,14 +50,14 @@ export function AccountSection({onToast}:{onToast:(m:string)=>void}) {
             <Field label="New password"><input type="password" placeholder="••••••••" className="w-full px-3 py-2.5 border border-ink/15 rounded-lg text-[13px] bg-white text-ink"/></Field>
             <Field label="Confirm new password"><input type="password" placeholder="••••••••" className="w-full px-3 py-2.5 border border-ink/15 rounded-lg text-[13px] bg-white text-ink"/></Field>
             <div className="flex gap-2">
-              <button type="button" onClick={()=>{setShowPw(false);onToast("Password updated");}} className="px-4 py-1.5 bg-ink text-vellum rounded-lg text-xs font-medium">Update password</button>
+              <button type="button" onClick={()=>{setShowPw(false);toast("Password updated");}} className="px-4 py-1.5 bg-ink text-vellum rounded-lg text-xs font-medium">Update password</button>
               <button type="button" onClick={()=>setShowPw(false)} className="px-4 py-1.5 border border-vellum-border rounded-lg text-xs bg-white text-ink-secondary">Cancel</button>
             </div>
           </>
         ):(
           <div className="flex gap-2">
             <button type="button" onClick={()=>setShowPw(true)} className="px-4 py-1.5 border border-vellum-border rounded-lg text-xs bg-white text-ink-secondary hover:border-ink">Change password</button>
-            <button type="button" onClick={()=>onToast("Signed out of all other devices")} className="px-4 py-1.5 border border-vellum-border rounded-lg text-xs bg-white text-ink-secondary hover:border-ink">Sign out everywhere</button>
+            <button type="button" onClick={()=>toast("Signed out of all other devices")} className="px-4 py-1.5 border border-vellum-border rounded-lg text-xs bg-white text-ink-secondary hover:border-ink">Sign out everywhere</button>
           </div>
         )}
       </Card>

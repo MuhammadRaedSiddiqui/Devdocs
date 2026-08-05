@@ -444,17 +444,17 @@ corresponding prompt file before starting work on any of them.
 | Feature | Prompt file | Status |
 |---|---|---|
 | Clerk auth + tRPC + server streaming | `IMPLEMENTATION_STRATEGY.md` Phases 1-4 | ✅ **Complete** |
-| Amazon Bedrock provider | `PROMPT_02_BEDROCK.md` | Pending |
-| Error states + timeout handling | `CLAUDE_CODE_PROMPTS.md` Prompt 4 | Pending |
-| Domain skipping by project type | `CLAUDE_CODE_PROMPTS.md` Prompt 5 | Pending |
-| Inline document editing | `CLAUDE_CODE_PROMPTS.md` Prompt 6 | Pending |
-| ZIP export | `CLAUDE_CODE_PROMPTS.md` Prompt 7 | Pending |
-| Cmd+K search | `CLAUDE_CODE_PROMPTS.md` Prompt 9 | Pending |
-| react-markdown + XSS safety | `CLAUDE_CODE_PROMPTS.md` Prompt 10 | Pending |
-| Global toast provider | `CLAUDE_CODE_PROMPTS.md` Prompt 11 | Pending |
-| Mobile responsive layout | `CLAUDE_CODE_PROMPTS.md` Prompt 12 | Pending |
-| Templates page | `CLAUDE_CODE_PROMPTS.md` Prompt 13 | Pending |
-| Loading skeletons | `CLAUDE_CODE_PROMPTS.md` Prompt 14 | Pending |
+| Amazon Bedrock provider | `PROMPT_02_BEDROCK.md` | ✅ **Complete** |
+| Error states + timeout handling | `CLAUDE_CODE_PROMPTS.md` Prompt 4 | ✅ **Complete** |
+| Domain skipping by project type | `CLAUDE_CODE_PROMPTS.md` Prompt 5 | ✅ **Complete** |
+| Inline document editing | `CLAUDE_CODE_PROMPTS.md` Prompt 6 | ✅ **Complete** |
+| ZIP export | `CLAUDE_CODE_PROMPTS.md` Prompt 7 | ✅ **Complete** |
+| Cmd+K search | `CLAUDE_CODE_PROMPTS.md` Prompt 9 | ✅ **Complete** |
+| react-markdown + XSS safety | `CLAUDE_CODE_PROMPTS.md` Prompt 10 | ✅ **Complete** |
+| Global toast provider | `CLAUDE_CODE_PROMPTS.md` Prompt 11 | ✅ **Complete** |
+| Mobile responsive layout | `CLAUDE_CODE_PROMPTS.md` Prompt 12 | ✅ **Complete** |
+| Templates page | `CLAUDE_CODE_PROMPTS.md` Prompt 13 | ✅ **Complete** |
+| Loading skeletons | `CLAUDE_CODE_PROMPTS.md` Prompt 14 | ✅ **Complete** |
 
 ---
 

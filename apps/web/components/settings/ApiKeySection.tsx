@@ -13,10 +13,10 @@ import {
   ACTIVE_PROVIDER_KEY,
 } from "@/lib/ai/provider";
 import { fetchKeys, saveKey, deleteKey } from "@/lib/ai/keys";
+import { useToast } from "@/lib/toast";
 
 interface Props {
   onConnectedChange: (provider: AIProvider, connected: boolean) => void;
-  onToast: (msg: string) => void;
 }
 
 interface ProviderState {
@@ -34,14 +34,18 @@ function defaultProviderState(): ProviderState {
   return { connected: false, maskedKey: "", lastVerified: "", showInput: false, showRemove: false, keyInput: "", verifying: false, verifyError: null };
 }
 
-export function ApiKeySection({ onConnectedChange, onToast }: Props) {
+export function ApiKeySection({ onConnectedChange }: Props) {
+  const { toast } = useToast();
   const { getToken } = useAuth();
-  const [activeTab,     setActiveTab]     = useState<AIProvider>("anthropic");
+  const [activeTab,     setActiveTab]     = useState<"anthropic" | "openai">("anthropic");
   const [activeProvider, setActiveProvider] = useState<AIProvider>("anthropic");
-  const [states, setStates] = useState<Record<AIProvider, ProviderState>>({
+  const [states, setStates] = useState<Record<"anthropic" | "openai", ProviderState>>({
     anthropic: defaultProviderState(),
     openai:    defaultProviderState(),
   });
+  const [bedrockStatus, setBedrockStatus] = useState<{
+    configured: boolean; region: string | null; model: string | null;
+  } | null>(null);
 
   // Load stored key metadata (masked, never raw) from the API on mount.
   // The active-provider *preference* is a non-secret UI setting kept locally.
@@ -51,35 +55,44 @@ export function ApiKeySection({ onConnectedChange, onToast }: Props) {
       try {
         const stored = await fetchKeys(getToken);
         if (cancelled) return;
-        const saved: Record<AIProvider, ProviderState> = {
+        const saved: Record<"anthropic" | "openai", ProviderState> = {
           anthropic: defaultProviderState(),
           openai:    defaultProviderState(),
         };
         stored.forEach(k => {
-          saved[k.provider] = {
-            ...saved[k.provider],
-            connected: true,
-            maskedKey: k.maskedKey,
-            lastVerified: "previously",
-          };
+          if (k.provider === "anthropic" || k.provider === "openai") {
+            saved[k.provider] = {
+              ...saved[k.provider],
+              connected: true,
+              maskedKey: k.maskedKey,
+              lastVerified: "previously",
+            };
+          }
         });
         setStates(saved);
       } catch {
-        if (!cancelled) onToast("Could not load saved API keys");
+        if (!cancelled) toast("Could not load saved API keys");
       }
     })();
+    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+    fetch(`${apiBase}/ai/bedrock-status`)
+      .then(r => r.json())
+      .then(data => { if (!cancelled) setBedrockStatus(data); })
+      .catch(() => { if (!cancelled) setBedrockStatus({ configured: false, region: null, model: null }); });
     const active = (localStorage.getItem(ACTIVE_PROVIDER_KEY) ?? "anthropic") as AIProvider;
     setActiveProvider(active);
     return () => { cancelled = true; };
-  }, [getToken, onToast]);
+  }, [getToken, toast]);
 
-  function update(provider: AIProvider, patch: Partial<ProviderState>) {
+  type KeyProvider = "anthropic" | "openai";
+
+  function update(provider: KeyProvider, patch: Partial<ProviderState>) {
     setStates(prev => ({ ...prev, [provider]: { ...prev[provider], ...patch } }));
   }
 
-  async function handleVerify(provider: AIProvider) {
+  async function handleVerify(provider: KeyProvider) {
     const key = states[provider].keyInput.trim();
-    if (!key) { onToast("Enter your API key first"); return; }
+    if (!key) { toast("Enter your API key first"); return; }
     update(provider, { verifying: true, verifyError: null });
 
     // The server verifies the key against the provider, then encrypts and
@@ -102,17 +115,15 @@ export function ApiKeySection({ onConnectedChange, onToast }: Props) {
       showInput: false, keyInput: "",
     });
     onConnectedChange(provider, true);
-    onToast(`${provider === "anthropic" ? "Anthropic" : "OpenAI"} API key verified and saved`);
+    toast(`${provider === "anthropic" ? "Anthropic" : "OpenAI"} API key verified and saved`);
   }
 
-  async function handleRemove(provider: AIProvider) {
+  async function handleRemove(provider: KeyProvider) {
     const ok = await deleteKey(getToken, provider);
-    if (!ok) { onToast("Failed to remove API key"); return; }
+    if (!ok) { toast("Failed to remove API key"); return; }
 
-    // If this was the active provider, move the preference to the other
-    // connected provider if one exists.
     if (activeProvider === provider) {
-      const other: AIProvider = provider === "anthropic" ? "openai" : "anthropic";
+      const other: KeyProvider = provider === "anthropic" ? "openai" : "anthropic";
       if (states[other].connected) {
         localStorage.setItem(ACTIVE_PROVIDER_KEY, other);
         setActiveProvider(other);
@@ -122,14 +133,19 @@ export function ApiKeySection({ onConnectedChange, onToast }: Props) {
     }
     update(provider, { connected: false, maskedKey: "", lastVerified: "", showRemove: false });
     onConnectedChange(provider, false);
-    onToast(`${provider === "anthropic" ? "Anthropic" : "OpenAI"} API key removed`);
+    toast(`${provider === "anthropic" ? "Anthropic" : "OpenAI"} API key removed`);
   }
 
   function handleSetActiveProvider(provider: AIProvider) {
-    if (!states[provider].connected) return;
+    if (provider === "bedrock") {
+      if (!bedrockStatus?.configured) return;
+    } else if (!states[provider].connected) {
+      return;
+    }
     localStorage.setItem(ACTIVE_PROVIDER_KEY, provider);
     setActiveProvider(provider);
-    onToast(`Switched to ${provider === "anthropic" ? "Anthropic Claude" : "OpenAI GPT-4o"}`);
+    const labels: Record<AIProvider, string> = { anthropic: "Anthropic Claude", openai: "OpenAI GPT-4o", bedrock: "Amazon Bedrock" };
+    toast(`Switched to ${labels[provider]}`);
   }
 
   const s = states[activeTab];
@@ -153,7 +169,7 @@ export function ApiKeySection({ onConnectedChange, onToast }: Props) {
       {/* Provider tabs */}
       <Card title="API Keys" sub="Add keys for one or both providers. You can switch between them at any time.">
         <div className="flex gap-1.5 mb-4">
-          {(["anthropic", "openai"] as AIProvider[]).map(p => (
+          {(["anthropic", "openai"] as const).map(p => (
             <button
               key={p}
               type="button"
@@ -287,7 +303,7 @@ export function ApiKeySection({ onConnectedChange, onToast }: Props) {
       {/* Active provider selector */}
       <Card title="Active provider" sub="Which AI powers your planning interview.">
         <div className="flex flex-col gap-2">
-          {(["anthropic", "openai"] as AIProvider[]).map(p => {
+          {(["anthropic", "openai"] as ("anthropic" | "openai")[]).map(p => {
             const connected = states[p].connected;
             const isActive  = activeProvider === p;
             return (
@@ -309,7 +325,7 @@ export function ApiKeySection({ onConnectedChange, onToast }: Props) {
                     {p === "anthropic" ? "Anthropic Claude" : "OpenAI"}
                   </div>
                   <div className="text-[11px] text-ink-faint mt-0.5">
-                    {PROVIDER_MODELS[p].label} · {PROVIDER_MODELS[p].default}
+                    {`${PROVIDER_MODELS[p].label} · ${PROVIDER_MODELS[p].default}`}
                   </div>
                   {!connected && (
                     <div className="text-[11px] mt-0.5" style={{ color: "#9c9a92" }}>
@@ -324,7 +340,6 @@ export function ApiKeySection({ onConnectedChange, onToast }: Props) {
                   {!connected && (
                     <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-[#ece9e1] text-ink-muted">No key</span>
                   )}
-                  {/* Radio circle */}
                   <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
                     isActive && connected ? "border-ink" : "border-vellum-border"
                   }`}>
@@ -334,6 +349,48 @@ export function ApiKeySection({ onConnectedChange, onToast }: Props) {
               </button>
             );
           })}
+
+          {/* Bedrock option */}
+          <button
+            type="button"
+            disabled={!bedrockStatus?.configured}
+            onClick={() => bedrockStatus?.configured && handleSetActiveProvider("bedrock")}
+            className={`flex items-center justify-between p-3.5 rounded-lg border text-left transition-colors ${
+              activeProvider === "bedrock" && bedrockStatus?.configured
+                ? "border-ink bg-white"
+                : bedrockStatus?.configured
+                ? "border-vellum-border bg-vellum hover:border-ink/30"
+                : "border-vellum-border-light bg-vellum opacity-50 cursor-not-allowed"
+            }`}
+          >
+            <div>
+              <div className="text-[13px] font-medium text-ink">Amazon Bedrock</div>
+              <div className="text-[11px] text-ink-faint mt-0.5">
+                {bedrockStatus?.configured
+                  ? `${bedrockStatus.region} · ${bedrockStatus.model?.split(".").pop()?.replace(/-v\d+:\d+$/, "") ?? "Claude"}`
+                  : "Not configured on this server"}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+              {bedrockStatus?.configured ? (
+                <>
+                  {activeProvider === "bedrock" && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-medium badge-green">Active</span>
+                  )}
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-medium badge-amber">Server</span>
+                </>
+              ) : (
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-[#ece9e1] text-ink-muted">
+                  Not configured
+                </span>
+              )}
+              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                activeProvider === "bedrock" && bedrockStatus?.configured ? "border-ink" : "border-vellum-border"
+              }`}>
+                {activeProvider === "bedrock" && bedrockStatus?.configured && <div className="w-2 h-2 rounded-full bg-ink" />}
+              </div>
+            </div>
+          </button>
         </div>
 
         <div className="text-[11px] text-ink-faint mt-3">
@@ -343,6 +400,36 @@ export function ApiKeySection({ onConnectedChange, onToast }: Props) {
           <a href="https://platform.openai.com/usage" target="_blank" rel="noreferrer" className="text-ink underline">OpenAI dashboard</a>
           .
         </div>
+      </Card>
+
+      {/* Bedrock info card */}
+      <Card title="Amazon Bedrock" sub="Use Claude via AWS infrastructure — server-configured only.">
+        {bedrockStatus?.configured ? (
+          <div className="flex gap-2.5 p-3.5 rounded-lg border-l-[3px]" style={{ borderLeftColor: "#0F6E56", background: "#F0FDFA" }}>
+            <span className="text-sm flex-shrink-0">✓</span>
+            <div className="text-[12.5px] leading-snug" style={{ color: "#0a4a3d" }}>
+              <strong className="font-medium">Bedrock is configured.</strong> Using region{" "}
+              <code className="font-mono text-[11px]">{bedrockStatus.region}</code> with model{" "}
+              <code className="font-mono text-[11px]">{bedrockStatus.model}</code>.
+              <br/>To change the model, update <code className="font-mono text-[11px]">AWS_BEDROCK_MODEL</code>{" "}
+              in your server environment.
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-2.5 p-3.5 rounded-lg border-l-[3px]" style={{ borderLeftColor: "#dedcd1", background: "#faf9f5" }}>
+            <span className="text-sm flex-shrink-0 text-ink-faint">○</span>
+            <div className="text-[12.5px] leading-snug text-ink-muted">
+              Bedrock is not configured on this server. Add{" "}
+              <code className="font-mono text-[11px]">AWS_ACCESS_KEY_ID</code>,{" "}
+              <code className="font-mono text-[11px]">AWS_SECRET_ACCESS_KEY</code>, and{" "}
+              <code className="font-mono text-[11px]">AWS_REGION</code> to your API environment,
+              then enable model access in the{" "}
+              <a href="https://console.aws.amazon.com/bedrock" target="_blank" rel="noreferrer" className="text-ink underline">
+                AWS Bedrock console
+              </a>.
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   );

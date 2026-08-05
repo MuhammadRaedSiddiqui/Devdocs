@@ -24,31 +24,3 @@ export function getActiveConfig(): AIProviderConfig | null {
   const provider = (localStorage.getItem(ACTIVE_PROVIDER_KEY) ?? 'anthropic') as AIProvider;
   return { provider, ...session };
 }
-
-/**
- * Server-side Anthropic endpoint config, mirroring `GET /ai/anthropic-status`.
- * When `serverManaged` is true the API holds an ANTHROPIC_AUTH_TOKEN, so the
- * Anthropic provider is usable without the user storing their own key.
- */
-export interface AnthropicStatus {
-  serverManaged: boolean;
-  host: string | null;
-  model: string | null;
-}
-
-export const ANTHROPIC_STATUS_UNSET: AnthropicStatus = {
-  serverManaged: false,
-  host: null,
-  model: null,
-};
-
-export async function fetchAnthropicStatus(): Promise<AnthropicStatus> {
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-  try {
-    const res = await fetch(`${apiBase}/ai/anthropic-status`);
-    if (!res.ok) return ANTHROPIC_STATUS_UNSET;
-    return (await res.json()) as AnthropicStatus;
-  } catch {
-    return ANTHROPIC_STATUS_UNSET;
-  }
-}

@@ -7,10 +7,6 @@ export interface AIConfig {
   provider: AIProvider;
   apiKey:   string;
   model:    string;
-  /** Anthropic only — custom API host (proxy / gateway). */
-  baseURL?: string;
-  /** Anthropic only — bearer token used instead of the x-api-key header. */
-  authToken?: string;
 }
 
 export interface StreamCallbacks {
@@ -44,13 +40,7 @@ async function streamAnthropic(
 ) {
   try {
     const Anthropic = (await import("@anthropic-ai/sdk")).default;
-    // With a bearer token, apiKey must be null — the SDK prefers x-api-key when
-    // both are present, which a gateway expecting Authorization would reject.
-    const client    = new Anthropic(
-      config.authToken
-        ? { apiKey: null, authToken: config.authToken, baseURL: config.baseURL }
-        : { apiKey: config.apiKey, baseURL: config.baseURL }
-    );
+    const client    = new Anthropic({ apiKey: config.apiKey });
     let   accumulated = "";
 
     const stream = client.messages.stream(
@@ -72,7 +62,7 @@ async function streamAnthropic(
     callbacks.onDone(accumulated);
   } catch (err: unknown) {
     if (isAbort(err)) return;
-    callbacks.onError(...mapAnthropicError(err, config));
+    callbacks.onError(...mapAnthropicError(err));
   }
 }
 
@@ -161,23 +151,14 @@ function isAbort(err: unknown): boolean {
 
 type ErrorTuple = [string, string];
 
-function mapAnthropicError(err: unknown, config?: AIConfig): ErrorTuple {
-  const msg    = err instanceof Error ? err.message : String(err);
-  // A custom endpoint changes what a failure means: 401 is a bad server-side
-  // token or misconfigured gateway, not the user's key.
-  const custom = !!config?.baseURL || !!config?.authToken;
-  const target = custom ? "the configured Anthropic endpoint" : "Anthropic";
-
-  if (msg.includes("401") || msg.includes("403") || msg.includes("authentication"))
-    return ["auth", custom
-      ? "Authentication failed at the configured Anthropic endpoint. Check ANTHROPIC_AUTH_TOKEN and ANTHROPIC_BASE_URL."
-      : "Anthropic API key invalid or revoked."];
-  if (msg.includes("404") && custom)
-    return ["unknown",    "Anthropic endpoint returned 404. ANTHROPIC_BASE_URL should be the API root, without /v1."];
+function mapAnthropicError(err: unknown): ErrorTuple {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (msg.includes("401") || msg.includes("authentication"))
+    return ["auth",       "Anthropic API key invalid or revoked."];
   if (msg.includes("429") || msg.includes("rate"))
-    return ["rate_limit", `Rate limit reached at ${target}. Wait and retry.`];
-  if (msg.includes("fetch") || msg.includes("network") || msg.includes("ECONNREFUSED"))
-    return ["network",    `Network error reaching ${target}.`];
+    return ["rate_limit", "Anthropic rate limit reached. Wait and retry."];
+  if (msg.includes("fetch") || msg.includes("network"))
+    return ["network",    "Network error reaching Anthropic."];
   return ["unknown", `Anthropic error: ${msg}`];
 }
 

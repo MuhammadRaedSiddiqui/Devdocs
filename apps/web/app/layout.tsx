@@ -5,6 +5,8 @@
 import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from '@clerk/nextjs';
 import { TRPCProvider } from '@/components/providers/trpc-provider';
+import { ToastProvider } from '@/lib/toast';
+import { ToastStack } from '@/components/ui/ToastStack';
 import { inter, lora } from "@/lib/fonts";
 import "@/app/globals.css";
 
@@ -56,7 +58,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           className={`${inter.variable} ${lora.variable}`}
         >
           <body className="font-sans antialiased bg-vellum text-ink">
-            {children}
+            <ToastProvider>
+              {children}
+              <ToastStack />
+            </ToastProvider>
           </body>
         </html>
       </TRPCProvider>

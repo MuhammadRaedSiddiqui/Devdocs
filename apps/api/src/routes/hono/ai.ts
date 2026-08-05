@@ -6,9 +6,9 @@ import { streamAIResponse } from '../../lib/aiStream';
 import { checkRateLimit } from '../../lib/rateLimit';
 import { requireClerkAuth } from '../../middleware/hono-clerk-auth';
 import { loadDecryptedKey } from './keys';
-import { anthropicEndpointHost, getAnthropicEndpoint } from '../../lib/anthropicConfig';
 
-const models: Record<Exclude<AIProvider, 'anthropic'>, string> = {
+const models: Record<AIProvider, string> = {
+  anthropic: 'claude-sonnet-4-6',
   openai: 'gpt-4o',
   bedrock: process.env.AWS_BEDROCK_MODEL ?? PROVIDER_MODELS.bedrock.default,
 };
@@ -25,17 +25,6 @@ app.get('/bedrock-status', (c) => {
     configured,
     region: configured ? (process.env.AWS_REGION ?? 'us-east-1') : null,
     model: configured ? (process.env.AWS_BEDROCK_MODEL ?? PROVIDER_MODELS.bedrock.default) : null,
-  });
-});
-
-app.get('/anthropic-status', (c) => {
-  const endpoint = getAnthropicEndpoint();
-  return c.json({
-    // True when ANTHROPIC_AUTH_TOKEN is set — users don't need their own key.
-    serverManaged: endpoint.serverManaged,
-    // Hostname only; the full URL may embed a path or private routing details.
-    host: anthropicEndpointHost(endpoint.baseURL),
-    model: endpoint.serverManaged ? endpoint.model : null,
   });
 });
 
@@ -62,7 +51,6 @@ app.post('/stream', async (c) => {
     );
   }
 
-  const anthropic = getAnthropicEndpoint();
   let apiKey: string;
   let model: string;
   if (provider === "bedrock") {
@@ -71,15 +59,11 @@ app.post('/stream', async (c) => {
     }
     apiKey = "bedrock-env";
     model = models.bedrock;
-  } else if (provider === "anthropic" && anthropic.serverManaged) {
-    // A server-side bearer token authenticates every user — no stored key needed.
-    apiKey = "";
-    model = anthropic.model;
   } else {
     const key = await loadDecryptedKey(userId, provider);
     if (!key) return c.json({ error: 'no_key', message: `No ${provider} API key found.` }, 400);
     apiKey = key;
-    model = provider === "anthropic" ? anthropic.model : models.openai;
+    model = models[provider];
   }
   let data = (project.interviewData ?? {}) as Record<string, unknown>;
   if (!data.lockedContext) {
@@ -108,8 +92,6 @@ app.post('/stream', async (c) => {
         provider,
         apiKey,
         model,
-        // Ignored by every provider except Anthropic.
-        ...(provider === 'anthropic' ? { baseURL: anthropic.baseURL, authToken: anthropic.authToken } : {}),
       }, {
         onToken: (text) => send({ type: 'token', text }),
         onDone: async (text) => {

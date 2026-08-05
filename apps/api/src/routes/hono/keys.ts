@@ -6,10 +6,12 @@ import { db, userApiKeys } from '../../lib/db';
 import { decryptKey, encryptKey, maskKey } from '../../lib/crypto';
 import { requireClerkAuth } from '../../middleware/hono-clerk-auth';
 
-const models: Record<AIProvider, string> = {
+// Only the two BYOK providers verify keys here. Bedrock and router are
+// server-configured and never store a user key.
+const models = {
   anthropic: 'claude-sonnet-4-6',
   openai: 'gpt-4o',
-};
+} as const;
 
 const app = new Hono();
 app.use('*', requireClerkAuth);

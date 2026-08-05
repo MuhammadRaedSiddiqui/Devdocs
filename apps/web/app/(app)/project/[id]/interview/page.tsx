@@ -10,9 +10,16 @@ import { InterviewSkeleton } from "@/components/interview/InterviewSkeleton";
 import { useInterviewStore } from "@/lib/interview/store";
 import { getActiveConfig } from "@/lib/ai/provider";
 import { setAISession } from "@/lib/ai/provider";
+import type { AIProvider } from "@/lib/ai/provider";
 import { trpc } from "@/lib/trpc";
 import type { ChatMessage, DomainId, ProjectContext, ProjectType } from "@/lib/types";
 import { useAuth } from "@clerk/nextjs";
+
+const PROVIDER_LABELS: Record<AIProvider, string> = {
+  anthropic: "Anthropic",
+  openai: "OpenAI",
+  bedrock: "Bedrock",
+};
 
 type SavedInterviewData = {
   lockedContext?: ProjectContext | null;
@@ -140,7 +147,7 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
         <div className="ml-auto flex items-center gap-2">
           {store.currentProvider && (
             <span className="text-[11px] px-2.5 py-1 rounded-full border border-vellum-border text-ink-faint bg-white hidden sm:inline">
-              {store.currentProvider === "anthropic" ? "Anthropic" : "OpenAI"}
+              {PROVIDER_LABELS[store.currentProvider] ?? store.currentProvider}
             </span>
           )}
           <span className="text-[11px] px-3 py-1 rounded-full font-medium bg-[#ccdbe8] text-[#0c447c]">

@@ -1,20 +1,27 @@
 // lib/interview/domains.ts
-import type { DomainDefinition, DomainId, ProjectContext } from "@/lib/types";
+import type { DomainDefinition, DomainId, ProjectContext, ProjectType } from "@/lib/types";
 import { PROJECT_TYPE_LABELS } from "@/lib/types";
 import { CARD_CHOICES } from "@/lib/interview/choices";
 
+const ALL_TYPES: ProjectType[] = ["saas", "api", "internal_tool", "mobile", "landing_page", "other"];
+const EXCEPT_LANDING: ProjectType[] = ["saas", "api", "internal_tool", "mobile", "other"];
+
 export const DOMAINS: DomainDefinition[] = [
-  { id: "planning",     label: "Planning & Scope",  file: "PLANNING.md",       mode: "open" },
-  { id: "architecture", label: "Architecture",       file: "ARCHITECTURE.md",   mode: "cards", requiredChoiceKey: "pattern" },
-  { id: "database",     label: "Database Design",    file: "DATABASE.md",       mode: "schema" },
-  { id: "api",          label: "API Contracts",      file: "API-CONTRACTS.md",  mode: "open" },
-  { id: "environment",  label: "Env Strategy",       file: "ENV-STRATEGY.md",   mode: "cards", requiredChoiceKey: "envStrategy" },
-  { id: "auth",         label: "Authentication",     file: "AUTH.md",           mode: "cards", requiredChoiceKey: "authProvider" },
-  { id: "testing",      label: "Testing",            file: "TESTING.md",        mode: "cards", requiredChoiceKey: "testingStrategy" },
-  { id: "monitoring",   label: "Monitoring",         file: "MONITORING.md",     mode: "cards", requiredChoiceKey: "monitoringStack" },
-  { id: "frontend",     label: "Frontend",           file: "FRONTEND.md",       mode: "open" },
-  { id: "deployment",   label: "Deployment",         file: "DEPLOYMENT.md",     mode: "cards", requiredChoiceKey: "deploymentPlatform" },
+  { id: "planning",     label: "Planning & Scope",  file: "PLANNING.md",       mode: "open",   relevantFor: ALL_TYPES },
+  { id: "architecture", label: "Architecture",       file: "ARCHITECTURE.md",   mode: "cards",  requiredChoiceKey: "pattern",            relevantFor: ALL_TYPES },
+  { id: "database",     label: "Database Design",    file: "DATABASE.md",       mode: "schema",                                          relevantFor: EXCEPT_LANDING },
+  { id: "api",          label: "API Contracts",      file: "API-CONTRACTS.md",  mode: "open",                                            relevantFor: ["saas", "api", "mobile", "other"] },
+  { id: "environment",  label: "Env Strategy",       file: "ENV-STRATEGY.md",   mode: "cards",  requiredChoiceKey: "envStrategy",        relevantFor: EXCEPT_LANDING },
+  { id: "auth",         label: "Authentication",     file: "AUTH.md",           mode: "cards",  requiredChoiceKey: "authProvider",       relevantFor: EXCEPT_LANDING },
+  { id: "testing",      label: "Testing",            file: "TESTING.md",        mode: "cards",  requiredChoiceKey: "testingStrategy",    relevantFor: EXCEPT_LANDING },
+  { id: "monitoring",   label: "Monitoring",         file: "MONITORING.md",     mode: "cards",  requiredChoiceKey: "monitoringStack",    relevantFor: EXCEPT_LANDING },
+  { id: "frontend",     label: "Frontend",           file: "FRONTEND.md",       mode: "open",                                            relevantFor: ["saas", "mobile", "landing_page", "internal_tool", "other"] },
+  { id: "deployment",   label: "Deployment",         file: "DEPLOYMENT.md",     mode: "cards",  requiredChoiceKey: "deploymentPlatform", relevantFor: ALL_TYPES },
 ];
+
+export function getActiveDomains(projectType: ProjectType): DomainDefinition[] {
+  return DOMAINS.filter(d => d.relevantFor.includes(projectType));
+}
 
 export function getDomain(id: DomainId): DomainDefinition {
   const d = DOMAINS.find((x) => x.id === id);
@@ -22,9 +29,9 @@ export function getDomain(id: DomainId): DomainDefinition {
   return d;
 }
 
-export function nextDomainId(current: DomainId): DomainId | null {
-  const idx = DOMAINS.findIndex((d) => d.id === current);
-  return idx >= 0 && idx < DOMAINS.length - 1 ? DOMAINS[idx + 1].id : null;
+export function nextDomainId(current: DomainId, domains: DomainDefinition[] = DOMAINS): DomainId | null {
+  const idx = domains.findIndex((d) => d.id === current);
+  return idx >= 0 && idx < domains.length - 1 ? domains[idx + 1].id : null;
 }
 
 function fmtTeam(ctx: ProjectContext) { return ctx.teamSize.replace("_", " "); }

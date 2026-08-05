@@ -2,13 +2,74 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom Design Tokens */
+/* Stitch Design Tokens (from DESIGN_EXPORT.md) */
 :root {
-  --vellum-bg: #faf9f5; --vellum-surface: #ffffff;
-  --vellum-border: #dedcd1; --vellum-border-light: #ece9e1;
-  --ink: #141413; --ink-secondary: #3d3d3a; --ink-muted: #73726c; --ink-faint: #9c9a92;
-  --terracotta: #d97757;
-  --danger: #c0392b; --danger-bg: #fdf2f2; --danger-border: #f3c4c4;
+  /* Core Brand */
+  --ink-black: #141413;
+  --onyx: #1f1e1d;
+  --graphite: #3d3d3a;
+  --dusty-gray: #73726c;
+  --stone: #9c9a92;
+  --parchment: #dedcd1;
+  --vellum-white: #faf9f5;
+  --snow-white: #ffffff;
+  --pale-azure: #ccdbe8;
+  --terra-cotta: #d97757;
+  --terra-light: #f5e8e2;
+
+  /* Surface System */
+  --surface: #fdf8f7;
+  --surface-dim: #ddd9d8;
+  --surface-bright: #fdf8f7;
+  --surface-container-lowest: #ffffff;
+  --surface-container-low: #f7f3f2;
+  --surface-container: #f1edec;
+  --surface-container-high: #ebe7e6;
+  --surface-container-highest: #e5e2e1;
+
+  /* Semantic */
+  --primary: #000000;
+  --on-primary: #ffffff;
+  --secondary: #99462a;
+  --secondary-container: #fe9572;
+  --error: #ba1a1a;
+  --error-container: #ffdad6;
+  --outline: #767872;
+  --outline-variant: #c7c7c0;
+
+  /* Backward-compatible aliases */
+  --vellum-bg: var(--surface);
+  --vellum-surface: var(--vellum-white);
+  --vellum-border: var(--parchment);
+  --vellum-border-light: var(--surface-container-highest);
+  --ink: var(--ink-black);
+  --ink-secondary: var(--graphite);
+  --ink-muted: var(--dusty-gray);
+  --ink-faint: var(--stone);
+  --terracotta: var(--terra-cotta);
+  --danger: var(--error);
+  --danger-bg: var(--error-container);
+  --danger-border: var(--error-container);
+
+  /* Spacing */
+  --stitch-unit: 8px;
+  --stitch-gap-xs: 8px;
+  --stitch-gap-md: 24px;
+  --stitch-gap-lg: 32px;
+  --stitch-section-xl: 40px;
+  --stitch-container-max: 1200px;
+
+  /* Border Radius */
+  --stitch-radius: 4px;
+  --stitch-radius-lg: 8px;
+  --stitch-radius-xl: 12px;
+  --stitch-radius-full: 9999px;
+  --stitch-radius-input: 9.6px;
+
+  /* Typography */
+  --font-stitch-lora: "Lora", serif;
+  --font-stitch-inter: "Inter", sans-serif;
+  --font-stitch-mono: "JetBrains Mono", monospace;
   --font-mono: "JetBrains Mono", Menlo, monospace;
 }
 
@@ -20,5 +81,39 @@
 .badge-orange { background: #fce8d6; color: #7a3410; }
 
 /* Base Styles */
-body { background-color: var(--vellum-bg); color: var(--ink); }
-.font-serif-heading { font-family: var(--font-lora), Georgia, serif; font-weight: 400; }
+body { background-color: var(--vellum-bg); color: var(--ink); font-family: var(--font-stitch-inter); }
+
+/* Stitch Typography Classes */
+.font-stitch-serif { font-family: var(--font-stitch-lora); }
+.font-stitch-sans { font-family: var(--font-stitch-inter); }
+.font-stitch-mono { font-family: var(--font-stitch-mono); }
+
+.text-stitch-display { font-size: 56px; line-height: 1.2; font-weight: 330; font-family: var(--font-stitch-lora); }
+.text-stitch-h2 { font-size: 30px; line-height: 1.33; font-weight: 400; font-family: var(--font-stitch-lora); }
+.text-stitch-h3 { font-size: 24px; line-height: 1.33; font-weight: 400; font-family: var(--font-stitch-lora); }
+.text-stitch-h4 { font-size: 18px; line-height: 1.33; font-weight: 400; font-family: var(--font-stitch-lora); }
+.text-stitch-body-lg { font-size: 16px; line-height: 1.5; font-weight: 400; font-family: var(--font-stitch-inter); }
+.text-stitch-body-md { font-size: 15px; line-height: 1.4; font-weight: 400; font-family: var(--font-stitch-inter); }
+.text-stitch-body-sm { font-size: 14px; line-height: 1.4; font-weight: 400; font-family: var(--font-stitch-inter); }
+.text-stitch-caption { font-size: 12px; line-height: 1.33; font-weight: 400; font-family: var(--font-stitch-inter); }
+.text-stitch-label-caps { font-size: 11px; line-height: 1.33; font-weight: 500; font-family: var(--font-stitch-inter); letter-spacing: 0.05em; text-transform: uppercase; }
+
+/* Backward-compatible alias */
+.font-serif-heading { font-family: var(--font-stitch-lora); font-weight: 400; }
+
+/* Stitch Animations */
+@keyframes stitch-fadeIn {
+  from { opacity: 0.7; }
+  to { opacity: 1; }
+}
+@keyframes stitch-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-stitch-fadeIn { animation: stitch-fadeIn 100ms ease-out; }
+.animate-stitch-blink { animation: stitch-blink 500ms ease-in-out infinite; }
+.animate-toast-in { animation: toast-in 0.2s ease-out; }

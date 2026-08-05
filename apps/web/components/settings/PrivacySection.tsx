@@ -1,17 +1,19 @@
 "use client";
 import { useState } from "react";
 import { PageHeader, Card } from "@/components/settings/AccountSection";
-interface Props { onToast: (m:string)=>void; }
-export function PrivacySection({ onToast }: Props) {
+import { useToast } from "@/lib/toast";
+
+export function PrivacySection() {
+  const { toast } = useToast();
   const [deleteText, setDeleteText] = useState("");
   function exportData() {
-    onToast("Preparing your export...");
+    toast("Preparing your export...");
     setTimeout(()=>{
       const blob = new Blob(["# DevDocs AI — Data Export\n\nAccount: ahmad@devdocs.ai\nProjects exported: 4"],{type:"text/markdown"});
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a"); a.href=url; a.download="devdocs-ai-export.md";
       document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-      onToast("Downloaded devdocs-ai-export.md");
+      toast("Downloaded devdocs-ai-export.md");
     }, 800);
   }
   return (
@@ -33,7 +35,7 @@ export function PrivacySection({ onToast }: Props) {
           <div className="text-[11px] text-ink-faint mb-2">Type <strong className="text-ink">DELETE</strong> to confirm.</div>
           <div className="flex gap-2 items-center">
             <input type="text" value={deleteText} onChange={e=>setDeleteText(e.target.value)} placeholder="DELETE" className="px-3 py-2 border rounded-lg text-[13px] w-40 focus:outline-none" style={{borderColor:"#f3c4c4"}}/>
-            <button type="button" disabled={deleteText!=="DELETE"} onClick={()=>onToast("Account deletion would be processed here")} className="px-4 py-2 rounded-lg text-xs font-medium text-white disabled:opacity-40 disabled:cursor-not-allowed" style={{background:"#c0392b"}}>Delete my account</button>
+            <button type="button" disabled={deleteText!=="DELETE"} onClick={()=>toast("Account deletion would be processed here")} className="px-4 py-2 rounded-lg text-xs font-medium text-white disabled:opacity-40 disabled:cursor-not-allowed" style={{background:"#c0392b"}}>Delete my account</button>
           </div>
         </div>
       </div>

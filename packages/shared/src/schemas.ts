@@ -12,7 +12,7 @@ export const StreamRequestSchema = z.object({
     "auth", "testing", "monitoring", "frontend", "deployment",
   ]),
   userMessage: z.string().min(1, "Message cannot be empty").max(4000, "Message too long"),
-  provider:    z.enum(["anthropic", "openai"]).default("anthropic"),
+  provider:    z.enum(["anthropic", "openai", "bedrock"]).default("anthropic"),
 });
 
 export type StreamRequest = z.infer<typeof StreamRequestSchema>;

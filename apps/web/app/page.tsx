@@ -55,6 +55,10 @@ export default function LandingPage() {
 
   return (
     <div className={s.root}>
+      {/* Mobile notice */}
+      <div className="sm:hidden px-4 py-2.5 text-center text-[12px] text-white" style={{ background: "var(--terracotta)" }}>
+        DevDocs AI is best experienced on a larger screen.
+      </div>
       {/* NAV */}
       <nav className={s.nav}>
         <span className={s.navLogo}>DevDocs AI</span>

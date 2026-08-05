@@ -2,8 +2,8 @@
 // Real AI streaming wired via lib/ai/stream.ts — supports Anthropic + OpenAI.
 // Integration point remaining: persistToSupabase() (see prompt 3).
 import { create } from "zustand";
-import type { ChatMessage, DomainId, DomainPhase, ProjectContext, SchemaTables } from "@/lib/types";
-import { DOMAINS, getOpener, generateDoc, buildFullDocument, nextDomainId } from "@/lib/interview/domains";
+import type { ChatMessage, DomainDefinition, DomainId, DomainPhase, ProjectContext, SchemaTables } from "@/lib/types";
+import { DOMAINS, getActiveDomains, getOpener, generateDoc, buildFullDocument, nextDomainId } from "@/lib/interview/domains";
 import { CARD_CHOICES } from "@/lib/interview/choices";
 import { getActiveConfig, type AIProvider } from "@/lib/ai/provider";
 import { streamAIResponse, type StreamErrorType } from "@/lib/ai/stream";
@@ -54,6 +54,10 @@ interface InterviewState {
   schemaTables:     SchemaTables;
   schemaConfirmed:  boolean;
   helpIndex:        number;
+  activeDomains:    DomainDefinition[];
+
+  // Project metadata
+  projectName:      string;
 
   // Streaming / UI state
   isThinking:       boolean;
@@ -68,12 +72,15 @@ interface InterviewState {
   abortController:  AbortController | null;
 
   // Actions
+  setProjectName:    (name: string) => void;
   setLockedContext:  (ctx: ProjectContext) => void;
   setProvider:       (p: AIProvider) => void;
   lockDomainChoice:  (domain: DomainId, key: string, value: string) => void;
   sendMessage:       (text: string) => void;
   confirmSchema:     () => void;
   addSchemaField:    (table: string, field: string, type: string, note: string) => void;
+  setDomainContent:  (domainId: DomainId, content: string) => void;
+  regenerateDomain:  (domainId: DomainId) => void;
   cancelStream:      () => void;
   clearError:        () => void;
   resumeFromSaved:   (data: {
@@ -208,7 +215,8 @@ function completeDomain(set: SetFn, get: GetFn, domainId: DomainId) {
   }));
   persistToSupabase({ domainContent: get().domainContent });
 
-  const next = nextDomainId(domainId);
+  const active = get().activeDomains;
+  const next = nextDomainId(domainId, active);
   if (!next) {
     set({ isComplete: true });
     runReply(
@@ -237,6 +245,8 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
   schemaTables:     DEFAULT_SCHEMA,
   schemaConfirmed:  false,
   helpIndex:        0,
+  activeDomains:    DOMAINS,
+  projectName:      "",
   isThinking:       false,
   isStreaming:      false,
   streamingText:    "",
@@ -246,11 +256,18 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
   currentProvider:  null,
   abortController:  null,
 
+  setProjectName: (name) => set({ projectName: name }),
   setProvider: (p) => set({ currentProvider: p }),
 
   setLockedContext: (ctx) => {
-    set(s => ({ lockedContext: ctx, domainPhases: { ...s.domainPhases, planning: "interviewing" } }));
-    runOpener(set, get, "planning");
+    const active = getActiveDomains(ctx.projectType);
+    set(s => ({
+      lockedContext: ctx,
+      activeDomains: active,
+      currentDomain: active[0].id,
+      domainPhases: { ...s.domainPhases, [active[0].id]: "interviewing" },
+    }));
+    runOpener(set, get, active[0].id);
   },
 
   lockDomainChoice: (domain, key, value) => {
@@ -347,6 +364,19 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
     );
   },
 
+  setDomainContent: (domainId, content) => {
+    set(s => ({ domainContent: { ...s.domainContent, [domainId]: content } }));
+    persistToSupabase({ domainContent: get().domainContent });
+  },
+
+  regenerateDomain: (domainId) => {
+    const state = get();
+    if (!state.lockedContext) return;
+    const content = generateDoc(domainId, state.lockedContext, state.lockedChoices, state.elaboration);
+    set(s => ({ domainContent: { ...s.domainContent, [domainId]: content } }));
+    persistToSupabase({ domainContent: get().domainContent });
+  },
+
   cancelStream: () => {
     get().abortController?.abort();
     set({ abortController: null, isThinking: false, isStreaming: false, streamingText: "" });
@@ -355,6 +385,9 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
   clearError: () => set({ lastError: null }),
 
   resumeFromSaved: (data) => {
+    const active = getActiveDomains(data.lockedContext.projectType);
+    const activeCompleted = data.completedDomains.filter(id => active.some(d => d.id === id));
+    const nextIdx = active.findIndex(d => !activeCompleted.includes(d.id));
     set({
       lockedContext:    data.lockedContext,
       lockedChoices:    data.lockedChoices,
@@ -362,15 +395,14 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
       domainContent:    data.domainContent,
       messages:         data.conversationHistory,
       elaboration:      data.elaboration,
-      currentDomain:    data.completedDomains.length >= DOMAINS.length
-        ? DOMAINS[DOMAINS.length - 1].id
-        : DOMAINS[data.completedDomains.length].id,
-      isComplete: data.completedDomains.length >= DOMAINS.length,
+      activeDomains:    active,
+      currentDomain:    nextIdx === -1 ? active[active.length - 1].id : active[nextIdx].id,
+      isComplete:       nextIdx === -1,
       domainPhases: Object.fromEntries(
-        DOMAINS.map((d, i) => [
+        DOMAINS.map(d => [
           d.id,
           data.completedDomains.includes(d.id) ? "complete"
-          : i === data.completedDomains.length ? "interviewing"
+          : active[nextIdx]?.id === d.id ? "interviewing"
           : "not_started",
         ])
       ) as Record<DomainId, DomainPhase>,
@@ -383,7 +415,7 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
       lockedContext: null, lockedChoices: {}, domainPhases: initialPhases(),
       currentDomain: DOMAINS[0].id, completedDomains: [], domainContent: {},
       messages: [], elaboration: "", schemaTables: DEFAULT_SCHEMA,
-      schemaConfirmed: false, helpIndex: 0,
+      schemaConfirmed: false, helpIndex: 0, activeDomains: DOMAINS, projectName: "",
       isThinking: false, isStreaming: false, streamingText: "", isComplete: false,
       lastError: null, lastUserMessage: "", currentProvider: null, abortController: null,
     });

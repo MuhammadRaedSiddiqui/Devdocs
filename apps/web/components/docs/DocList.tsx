@@ -1,5 +1,6 @@
 "use client";
 import { cn } from "@/lib/utils";
+import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
 import type { LibraryDoc } from "@/lib/docs-library";
 
 interface ListProps { docs:LibraryDoc[]; search:string; sort:"recent"|"project"|"domain"; selectedId:string|null; onSearch:(v:string)=>void; onSort:(v:"recent"|"project"|"domain")=>void; onSelect:(id:string)=>void; }
@@ -59,12 +60,6 @@ export function DocPreview({doc}:PreviewProps) {
     const a=document.createElement("a"); a.href=url; a.download=doc.file;
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
   }
-  const html = doc!.content
-    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
-    .replace(/^## (.+)$/gm,'<h2 style="font-family:var(--font-lora);font-size:15px;font-weight:400;color:var(--ink);margin:0 0 8px;padding-bottom:6px;border-bottom:1px solid var(--vellum-border-light)">$1</h2>')
-    .replace(/\*\*(.*?)\*\*/g,'<strong style="font-weight:500;color:var(--ink)">$1</strong>')
-    .replace(/`([^`]+)`/g,'<code style="font-family:var(--font-mono);font-size:11px;background:var(--vellum-bg);border:1px solid var(--vellum-border);padding:1px 5px;border-radius:4px">$1</code>')
-    .replace(/\n/g,"<br/>");
   return (
     <div className="flex-1 flex flex-col overflow-hidden min-h-0">
       <div className="px-5 py-3.5 border-b border-vellum-border-light flex items-center justify-between flex-shrink-0">
@@ -74,7 +69,9 @@ export function DocPreview({doc}:PreviewProps) {
         </div>
         <button type="button" onClick={handleDownload} className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-ink text-vellum text-xs font-medium">↓ Download</button>
       </div>
-      <div className="flex-1 overflow-y-auto px-6 py-5 text-[13px] leading-relaxed text-ink-secondary" dangerouslySetInnerHTML={{__html:html}}/>
+      <div className="flex-1 overflow-y-auto px-6 py-5">
+        <MarkdownRenderer content={doc.content} size="md" />
+      </div>
     </div>
   );
 }

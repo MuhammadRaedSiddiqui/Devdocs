@@ -34,6 +34,7 @@ export interface DomainDefinition {
   file: string;
   mode: DomainMode;
   requiredChoiceKey?: string;
+  relevantFor: ProjectType[];
 }
 
 export interface ChatMessage {

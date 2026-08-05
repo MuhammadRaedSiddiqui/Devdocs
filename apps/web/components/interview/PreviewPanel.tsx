@@ -1,33 +1,146 @@
 "use client";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useInterviewStore, selectFullDocument } from "@/lib/interview/store";
+import { buildProjectZip } from "@/lib/export/buildZip";
+import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
+import type { DomainId } from "@/lib/types";
+
+function parseDocumentSections(doc: string): { header: string; sections: string[] } {
+  const parts = doc.split("\n\n---\n\n");
+  return { header: parts[0] ?? "", sections: parts.slice(1) };
+}
+
 export function PreviewPanel() {
   const store = useInterviewStore();
-  function handleDownload() {
-    const doc = selectFullDocument(store);
-    const blob = new Blob([doc],{type:"text/markdown"});
+  const [mode, setMode] = useState<"preview" | "edit">("preview");
+  const [editText, setEditText] = useState("");
+  const [regenerating, setRegenerating] = useState<DomainId | null>(null);
+  const [zipping, setZipping] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fullDoc = selectFullDocument(store);
+
+  useEffect(() => {
+    if (mode === "edit") setEditText(fullDoc);
+  }, [mode]);
+
+  const handleEditChange = useCallback((value: string) => {
+    setEditText(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const { sections } = parseDocumentSections(value);
+      const activeDomains = store.activeDomains;
+      sections.forEach((section, i) => {
+        if (i < activeDomains.length) {
+          const trimmed = section.replace(/\n\n---\n\n$/, "").trimEnd();
+          store.setDomainContent(activeDomains[i].id, trimmed);
+        }
+      });
+    }, 800);
+  }, [store]);
+
+  function handleRegenerate(domainId: DomainId) {
+    setRegenerating(domainId);
+    store.regenerateDomain(domainId);
+    setTimeout(() => setRegenerating(null), 300);
+  }
+
+  function handleDownloadMd() {
+    const doc = mode === "edit" ? editText : fullDoc;
+    const blob = new Blob([doc], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href=url; a.download="DOCUMENTATION.md";
+    const a = document.createElement("a"); a.href = url; a.download = "DOCUMENTATION.md";
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
   }
+
+  async function handleDownloadZip() {
+    if (!store.lockedContext) return;
+    setZipping(true);
+    try {
+      const blob = await buildProjectZip(store.lockedContext, store.domainContent);
+      const slug = store.projectName.replace(/\s+/g, "-").toLowerCase() || "project";
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = url; a.download = `${slug}-docs.zip`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    } finally {
+      setZipping(false);
+    }
+  }
+
   return (
-    <div className="flex-shrink-0 border-l border-vellum-border bg-vellum flex flex-col overflow-hidden transition-[width,opacity] duration-300" style={{width:store.isComplete?260:0,opacity:store.isComplete?1:0}}>
+    <div className="flex-shrink-0 border-l border-vellum-border bg-vellum flex flex-col overflow-hidden transition-[width,opacity] duration-300 max-md:!w-full max-md:!opacity-100 max-md:!border-l-0" style={{ width: store.isComplete ? 320 : 0, opacity: store.isComplete ? 1 : 0 }}>
       {store.isComplete && (
         <>
-          <div className="px-4 py-3 border-b border-vellum-border flex items-center justify-between flex-shrink-0">
-            <span className="font-serif-heading text-[13px] text-ink">DOCUMENTATION.md</span>
-            <button type="button" onClick={handleDownload} className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-ink text-vellum text-[11px] font-medium">↓ Download</button>
+          <div className="px-4 py-3 border-b border-vellum-border flex items-center gap-2 flex-shrink-0">
+            <span className="font-serif-heading text-[13px] text-ink flex-1">DOCUMENTATION.md</span>
+            <button
+              type="button"
+              onClick={() => setMode(mode === "preview" ? "edit" : "preview")}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-medium border ${mode === "edit" ? "bg-ink text-vellum border-ink" : "bg-white text-ink-secondary border-vellum-border hover:border-ink/30"}`}
+            >
+              {mode === "edit" ? "Preview" : "Edit"}
+            </button>
+            <button type="button" onClick={handleDownloadMd} className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-ink text-vellum text-[11px] font-medium">
+              ↓ .md
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadZip}
+              disabled={zipping}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-ink text-vellum text-[11px] font-medium disabled:opacity-50"
+            >
+              {zipping ? <span className="inline-block w-3 h-3 border-2 border-vellum border-t-transparent rounded-full animate-spin" /> : "↓ .zip"}
+            </button>
           </div>
-          <div className="flex-1 overflow-y-auto p-3.5 text-xs leading-relaxed text-ink-secondary" dangerouslySetInnerHTML={{__html:mdToHtml(selectFullDocument(store))}}/>
+
+          {mode === "edit" ? (
+            <textarea
+              value={editText}
+              onChange={e => handleEditChange(e.target.value)}
+              className="flex-1 w-full p-3.5 bg-vellum border-none text-ink font-mono text-xs leading-relaxed resize-none focus:outline-none"
+              spellCheck={false}
+            />
+          ) : (
+            <div className="flex-1 overflow-y-auto p-3.5">
+              {(() => {
+                const { header, sections } = parseDocumentSections(fullDoc);
+                const activeDomains = store.activeDomains;
+                return (
+                  <>
+                    <MarkdownRenderer content={header} size="sm" />
+                    {sections.map((section, i) => {
+                      const domainId = i < activeDomains.length ? activeDomains[i].id : null;
+                      if (regenerating === domainId) {
+                        return (
+                          <div key={i} className="flex items-center justify-center py-6 text-ink-faint text-[11px]">
+                            <span className="inline-block w-3 h-3 border-2 border-ink-faint border-t-transparent rounded-full animate-spin mr-2" />
+                            Regenerating...
+                          </div>
+                        );
+                      }
+                      return (
+                        <div key={i} className="relative group">
+                          <MarkdownRenderer content={section} size="sm" />
+                          {domainId && (
+                            <button
+                              type="button"
+                              onClick={() => handleRegenerate(domainId)}
+                              className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity px-2 py-0.5 rounded-md text-[10px] text-ink-muted border border-vellum-border bg-white hover:text-ink hover:border-ink/30"
+                            >
+                              ↻ Regenerate
+                            </button>
+                          )}
+                          {i < sections.length - 1 && <hr className="border-vellum-border-light my-3" />}
+                        </div>
+                      );
+                    })}
+                  </>
+                );
+              })()}
+            </div>
+          )}
         </>
       )}
     </div>
   );
-}
-function mdToHtml(text: string) {
-  return text
-    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
-    .replace(/^## (.+)$/gm,'<h2 style="font-family:var(--font-lora);font-size:13px;font-weight:400;color:var(--ink);margin:14px 0 5px;padding-bottom:4px;border-bottom:1px solid var(--vellum-border-light)">$1</h2>')
-    .replace(/\*\*(.*?)\*\*/g,'<strong style="font-weight:500;color:var(--ink)">$1</strong>')
-    .replace(/`([^`]+)`/g,'<code style="font-family:var(--font-mono);font-size:10px;background:#fff;border:1px solid var(--vellum-border);padding:1px 4px;border-radius:3px">$1</code>')
-    .replace(/\n/g,"<br/>");
 }
