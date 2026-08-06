@@ -145,7 +145,7 @@ function runReply(
 
   // Start timing tracking for session logging
   const state = get();
-  if (state.sessionLogger && !isInternalOpener) {
+  if (state.sessionLogger) {
     state.sessionLogger.startThinking();
   }
 
@@ -185,7 +185,7 @@ function runReply(
     set({ isThinking: false, isStreaming: true, streamingText: "" });
 
     // Mark streaming start for timing
-    if (s.sessionLogger && !isInternalOpener) {
+    if (s.sessionLogger) {
       s.sessionLogger.startStreaming();
     }
 
@@ -207,7 +207,7 @@ function runReply(
           };
 
           // Log assistant message with timing data
-          if (s.sessionLogger && s.currentProvider && !isInternalOpener) {
+          if (s.sessionLogger && s.currentProvider) {
             s.sessionLogger.logAssistantMessage(full, s.currentDomain, s.currentProvider, null, metadata);
           }
 
@@ -226,7 +226,7 @@ function runReply(
           const s = get();
 
           // Log error message
-          if (s.sessionLogger && s.currentProvider && !isInternalOpener) {
+          if (s.sessionLogger && s.currentProvider) {
             s.sessionLogger.logAssistantMessage(message, s.currentDomain, s.currentProvider, type);
           }
 
