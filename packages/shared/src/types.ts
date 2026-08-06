@@ -74,7 +74,7 @@ export interface InterviewData {
 }
 
 // ── AI provider types (shared between web settings UI and API key vault) ──────
-export type AIProvider = "anthropic" | "openai" | "bedrock";
+export type AIProvider = "anthropic" | "openai" | "bedrock" | "metamuse";
 
 export interface AIProviderConfig {
   provider: AIProvider;
@@ -86,6 +86,7 @@ export const PROVIDER_MODELS: Record<AIProvider, { default: string; label: strin
   anthropic: { default: "claude-sonnet-4-6",                        label: "Claude Sonnet 4.6" },
   openai:    { default: "gpt-4o",                                    label: "GPT-4o" },
   bedrock:   { default: "us.anthropic.claude-sonnet-4-5-20250929-v1:0", label: "Claude via Bedrock" },
+  metamuse:  { default: "muse-spark-1.1",                            label: "Muse Spark 1.1" },
 };
 
 export const BEDROCK_MODELS: { id: string; label: string }[] = [

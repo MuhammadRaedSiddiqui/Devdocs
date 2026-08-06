@@ -19,6 +19,7 @@ const PROVIDER_LABELS: Record<AIProvider, string> = {
   anthropic: "Anthropic",
   openai: "OpenAI",
   bedrock: "Bedrock",
+  metamuse: "Meta Muse",
 };
 
 type SavedInterviewData = {
@@ -57,6 +58,15 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
     if (!projectQuery.data || hasHydrated.current) return;
 
     const saved = readSavedInterviewData(projectQuery.data.interviewData);
+
+    // Set up token getter and project ID immediately
+    store.setProjectId(params.id);
+    store.setTokenGetter(getToken);
+    store.setProjectName(projectQuery.data.name);
+    setAISession(params.id, getToken);
+    const config = getActiveConfig();
+    if (config) store.setProvider(config.provider);
+
     if (saved?.lockedContext) {
       const hasHistory = (saved.conversationHistory ?? []).length > 0;
       if (hasHistory) {
@@ -79,15 +89,16 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
         });
         store.setLockedContext(saved.lockedContext);
       }
+
+      // Initialize session logging after everything is set up
+      if (!store.isComplete) {
+        store.initializeSession(getToken);
+      }
     }
 
-    store.setProjectName(projectQuery.data.name);
-    setAISession(params.id, getToken);
-    const config = getActiveConfig();
-    if (config) store.setProvider(config.provider);
     hasHydrated.current = true;
     setHydrated(true);
-  }, [projectQuery.data]);
+  }, [projectQuery.data, params.id, getToken, store]);
 
   const hasSavedContext = useRef(false);
   useEffect(() => {

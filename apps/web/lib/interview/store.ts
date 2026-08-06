@@ -8,6 +8,8 @@ import { CARD_CHOICES } from "@/lib/interview/choices";
 import { getActiveConfig, type AIProvider } from "@/lib/ai/provider";
 import { streamAIResponse, type StreamErrorType } from "@/lib/ai/stream";
 import { buildSystemPrompt } from "@/lib/ai/systemPrompt";
+import { SessionLogger } from "@/lib/session/logger";
+import type { MessageMetadata } from "@devdocs/shared";
 
 const DEFAULT_SCHEMA: SchemaTables = {
   users: [
@@ -58,6 +60,7 @@ interface InterviewState {
 
   // Project metadata
   projectName:      string;
+  projectId:        string | null;
 
   // Streaming / UI state
   isThinking:       boolean;
@@ -71,8 +74,16 @@ interface InterviewState {
   currentProvider:  AIProvider | null;
   abortController:  AbortController | null;
 
+  // Session logging
+  sessionLogger:    SessionLogger | null;
+  messageCount:     number;
+  tokenGetter:      (() => Promise<string | null>) | null;
+
   // Actions
   setProjectName:    (name: string) => void;
+  setProjectId:      (id: string) => void;
+  setTokenGetter:    (getter: () => Promise<string | null>) => void;
+  initializeSession: (getToken?: () => Promise<string | null>) => Promise<void>;
   setLockedContext:  (ctx: ProjectContext) => void;
   setProvider:       (p: AIProvider) => void;
   lockDomainChoice:  (domain: DomainId, key: string, value: string) => void;
@@ -132,8 +143,13 @@ function runReply(
   // Update current provider in state
   set({ currentProvider: config.provider, isThinking: true, lastError: null });
 
-  // Build context-aware system prompt from current store state
+  // Start timing tracking for session logging
   const state = get();
+  if (state.sessionLogger && !isInternalOpener) {
+    state.sessionLogger.startThinking();
+  }
+
+  // Build context-aware system prompt from current store state
   const systemPrompt = buildSystemPrompt(
     state.lockedContext!,
     state.currentDomain,
@@ -148,6 +164,13 @@ function runReply(
   const timeoutId = setTimeout(() => {
     controller.abort();
     const errMsg = ERROR_MESSAGES.timeout;
+    const s = get();
+
+    // Log timeout error
+    if (s.sessionLogger && s.currentProvider) {
+      s.sessionLogger.logAssistantMessage(errMsg, s.currentDomain, s.currentProvider, "timeout");
+    }
+
     set(s => ({
       isThinking: false, isStreaming: false, streamingText: "",
       abortController: null,
@@ -158,7 +181,13 @@ function runReply(
 
   // Short thinking delay for UX (gives the dots animation time to appear)
   setTimeout(() => {
+    const s = get();
     set({ isThinking: false, isStreaming: true, streamingText: "" });
+
+    // Mark streaming start for timing
+    if (s.sessionLogger && !isInternalOpener) {
+      s.sessionLogger.startStreaming();
+    }
 
     streamAIResponse(
       systemPrompt,
@@ -169,17 +198,38 @@ function runReply(
 
         onDone: (full) => {
           clearTimeout(timeoutId);
+          const s = get();
+
+          // Extract metadata from msgOpts for logging
+          const metadata: MessageMetadata = {
+            cardChoices: msgOpts.showCards ? s.lockedChoices[msgOpts.showCards] : undefined,
+            schemaAction: msgOpts.showSchema ? { type: "confirm_schema" } : undefined,
+          };
+
+          // Log assistant message with timing data
+          if (s.sessionLogger && s.currentProvider && !isInternalOpener) {
+            s.sessionLogger.logAssistantMessage(full, s.currentDomain, s.currentProvider, null, metadata);
+          }
+
           set(s => ({
             isStreaming:     false,
             streamingText:   "",
             abortController: null,
             messages:        [...s.messages, { role: "assistant" as const, content: full, ...msgOpts }],
+            messageCount:    s.messageCount + 1,
           }));
           onDone?.();
         },
 
         onError: (type, message) => {
           clearTimeout(timeoutId);
+          const s = get();
+
+          // Log error message
+          if (s.sessionLogger && s.currentProvider && !isInternalOpener) {
+            s.sessionLogger.logAssistantMessage(message, s.currentDomain, s.currentProvider, type);
+          }
+
           set(s => ({
             isStreaming:     false,
             streamingText:   "",
@@ -215,10 +265,27 @@ function completeDomain(set: SetFn, get: GetFn, domainId: DomainId) {
   }));
   persistToSupabase({ domainContent: get().domainContent });
 
+  // Update session with completed domain count
+  const state = get();
+  if (state.sessionLogger) {
+    state.sessionLogger.updateSession({
+      totalDomainsCompleted: state.completedDomains.length + 1,
+      totalMessages: state.messageCount,
+      primaryProvider: state.currentProvider ?? undefined,
+    });
+  }
+
   const active = get().activeDomains;
   const next = nextDomainId(domainId, active);
   if (!next) {
     set({ isComplete: true });
+
+    // End the session when interview is complete
+    const finalState = get();
+    if (finalState.sessionLogger) {
+      finalState.sessionLogger.endSession(true);
+    }
+
     runReply(
       set, get,
       "Generate the final completion message for the interview.",
@@ -247,6 +314,7 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
   helpIndex:        0,
   activeDomains:    DOMAINS,
   projectName:      "",
+  projectId:        null,
   isThinking:       false,
   isStreaming:      false,
   streamingText:    "",
@@ -255,9 +323,50 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
   lastUserMessage:  "",
   currentProvider:  null,
   abortController:  null,
+  sessionLogger:    null,
+  messageCount:     0,
+  tokenGetter:      null,
 
   setProjectName: (name) => set({ projectName: name }),
+  setProjectId: (id) => set({ projectId: id }),
   setProvider: (p) => set({ currentProvider: p }),
+
+  setTokenGetter: (getter) => set({ tokenGetter: getter }),
+
+  initializeSession: async (getToken) => {
+    const state = get();
+    if (!state.projectId || !state.lockedContext) {
+      console.warn('Cannot initialize session: missing projectId or lockedContext');
+      return;
+    }
+
+    // Use provided token getter or stored one
+    const tokenGetter = getToken || state.tokenGetter;
+    if (!tokenGetter) {
+      console.warn('Cannot initialize session: no token getter available');
+      return;
+    }
+
+    const logger = new SessionLogger(tokenGetter);
+    const sessionId = await logger.startSession({
+      projectId: state.projectId,
+      metadata: {
+        projectType: state.lockedContext.projectType,
+        activeDomains: state.activeDomains.map(d => d.id),
+        teamSize: state.lockedContext.teamSize,
+        timeline: state.lockedContext.timeline,
+        budget: state.lockedContext.budget,
+        experienceLevel: state.lockedContext.experienceLevel,
+      },
+    });
+
+    if (sessionId) {
+      set({ sessionLogger: logger });
+      console.log('Session logging initialized:', sessionId);
+    } else {
+      console.warn('Failed to initialize session logging');
+    }
+  },
 
   setLockedContext: (ctx) => {
     const active = getActiveDomains(ctx.projectType);
@@ -267,6 +376,14 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
       currentDomain: active[0].id,
       domainPhases: { ...s.domainPhases, [active[0].id]: "interviewing" },
     }));
+
+    // Initialize session logging immediately when context is first locked
+    const state = get();
+    if (!state.sessionLogger && state.projectId && state.tokenGetter) {
+      console.log('Initializing session on context lock');
+      state.initializeSession();
+    }
+
     runOpener(set, get, active[0].id);
   },
 
@@ -276,8 +393,19 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
     }));
     const label = CARD_CHOICES[domain]?.find(o => o.id === value)?.label ?? value;
     const domainLabel = DOMAINS.find(d => d.id === domain)!.label;
+
+    // Log card selection metadata
+    const metadata: MessageMetadata = {
+      cardChoices: { [key]: value },
+    };
+
+    const state = get();
+    if (state.sessionLogger) {
+      state.sessionLogger.logUserMessage(`Selected: ${label}`, domain, metadata);
+    }
+
     // Push user "message" (the card selection) then immediately trigger doc gen
-    set(s => ({ messages: [...s.messages, { role: "user" as const, content: `Selected: ${label}` }] }));
+    set(s => ({ messages: [...s.messages, { role: "user" as const, content: `Selected: ${label}` }], messageCount: s.messageCount + 1 }));
     runReply(
       set, get,
       `The user selected "${label}" for ${domainLabel}. Acknowledge the choice briefly (one sentence) and generate the ${domainLabel} documentation section.`,
@@ -293,7 +421,13 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
     const d      = DOMAINS.find(x => x.id === domain)!;
     const low    = text.toLowerCase();
 
-    set(s => ({ messages: [...s.messages, { role: "user" as const, content: text }], lastUserMessage: text }));
+    // Log user message to session
+    const state = get();
+    if (state.sessionLogger) {
+      state.sessionLogger.logUserMessage(text, domain);
+    }
+
+    set(s => ({ messages: [...s.messages, { role: "user" as const, content: text }], lastUserMessage: text, messageCount: s.messageCount + 1 }));
 
     // Post-completion clarification
     if (get().isComplete) {
@@ -329,7 +463,6 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
       } else {
         runReply(set, get, text, { showSchema: true });
       }
-
     } else {
       // "cards" mode — user typed instead of clicking a card
       runReply(set, get, text, { showCards: domain });
@@ -339,6 +472,15 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
   confirmSchema: () => {
     if (get().schemaConfirmed) return;
     set({ schemaConfirmed: true });
+
+    // Log schema confirmation
+    const state = get();
+    if (state.sessionLogger) {
+      state.sessionLogger.logUserMessage("Confirmed schema", "database", {
+        schemaAction: { type: "confirm_schema" },
+      });
+    }
+
     runReply(
       set, get,
       "The user confirmed the database schema. Acknowledge it (one sentence) and generate the Database Design documentation section.",
@@ -355,6 +497,20 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
         [table]: [...(s.schemaTables[table] ?? []), { field, type, note }],
       },
     }));
+
+    // Log schema field addition
+    const state = get();
+    if (state.sessionLogger) {
+      state.sessionLogger.logUserMessage(`Added field: ${field} to ${table}`, "database", {
+        schemaAction: {
+          type: "add_field",
+          table,
+          field,
+          fieldType: type,
+        },
+      });
+    }
+
     runReply(
       set, get,
       `The user added a field named "${field}" (type: ${type}) to the ${table} table. Acknowledge it briefly and ask if they want to add anything else before confirming the schema.`,

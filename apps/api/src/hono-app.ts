@@ -13,6 +13,7 @@ import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
 import projectsRouter from './routes/hono/projects';
 import keysRouter from './routes/hono/keys';
 import aiRouter from './routes/hono/ai';
+import sessionsRouter from './routes/hono/sessions';
 import { appRouter } from './trpc/router';
 import { createContext } from './trpc/context';
 
@@ -68,6 +69,7 @@ app.get('/health', (c) => {
 app.route('/projects', projectsRouter);
 app.route('/keys', keysRouter);
 app.route('/ai', aiRouter);
+app.route('/sessions', sessionsRouter);
 
 // Welcome endpoint
 app.get('/', (c) => {

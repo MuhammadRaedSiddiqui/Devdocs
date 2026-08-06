@@ -6,11 +6,12 @@ import { db, userApiKeys } from '../../lib/db';
 import { decryptKey, encryptKey, maskKey } from '../../lib/crypto';
 import { requireClerkAuth } from '../../middleware/hono-clerk-auth';
 
-// Only the two BYOK providers verify keys here. Bedrock and router are
-// server-configured and never store a user key.
+// Only the BYOK providers verify keys here. Bedrock is
+// server-configured and never stores a user key.
 const models = {
   anthropic: 'claude-sonnet-4-6',
   openai: 'gpt-4o',
+  metamuse: 'muse-spark-1.1',
 } as const;
 
 const app = new Hono();
@@ -43,7 +44,7 @@ app.post('/', zValidator('json', ApiKeyUpsertSchema), async (c) => {
 
 app.delete('/:provider', async (c) => {
   const provider = c.req.param('provider');
-  if (provider !== 'anthropic' && provider !== 'openai') {
+  if (provider !== 'anthropic' && provider !== 'openai' && provider !== 'metamuse') {
     return c.json({ error: 'bad_request', message: 'Invalid provider.' }, 400);
   }
   await db.delete(userApiKeys).where(and(
@@ -68,14 +69,20 @@ async function verifyKey(provider: AIProvider, key: string): Promise<string | nu
           body: JSON.stringify({ model: models.anthropic, max_tokens: 1, messages: [{ role: 'user', content: 'ping' }] }),
           signal: AbortSignal.timeout(8_000),
         })
-      : await fetch('https://api.openai.com/v1/chat/completions', {
+      : provider === 'openai'
+      ? await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST', headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
           body: JSON.stringify({ model: models.openai, max_tokens: 1, messages: [{ role: 'user', content: 'ping' }] }),
           signal: AbortSignal.timeout(8_000),
+        })
+      : await fetch('https://api.meta.ai/v1/chat/completions', {
+          method: 'POST', headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+          body: JSON.stringify({ model: models.metamuse, max_tokens: 1, messages: [{ role: 'user', content: 'ping' }] }),
+          signal: AbortSignal.timeout(8_000),
         });
-    if (response.status === 401) return `Invalid ${provider === 'anthropic' ? 'Anthropic' : 'OpenAI'} API key.`;
+    if (response.status === 401) return `Invalid ${provider === 'anthropic' ? 'Anthropic' : provider === 'openai' ? 'OpenAI' : 'Meta Muse'} API key.`;
     if (response.status === 429 || response.ok) return null;
-    return `${provider === 'anthropic' ? 'Anthropic' : 'OpenAI'} API error ${response.status}.`;
+    return `${provider === 'anthropic' ? 'Anthropic' : provider === 'openai' ? 'OpenAI' : 'Meta Muse'} API error ${response.status}.`;
   } catch {
     return 'Network error while verifying the API key.';
   }

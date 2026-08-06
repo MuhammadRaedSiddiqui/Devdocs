@@ -37,11 +37,12 @@ function defaultProviderState(): ProviderState {
 export function ApiKeySection({ onConnectedChange }: Props) {
   const { toast } = useToast();
   const { getToken } = useAuth();
-  const [activeTab,     setActiveTab]     = useState<"anthropic" | "openai">("anthropic");
+  const [activeTab,     setActiveTab]     = useState<"anthropic" | "openai" | "metamuse">("anthropic");
   const [activeProvider, setActiveProvider] = useState<AIProvider>("anthropic");
-  const [states, setStates] = useState<Record<"anthropic" | "openai", ProviderState>>({
+  const [states, setStates] = useState<Record<"anthropic" | "openai" | "metamuse", ProviderState>>({
     anthropic: defaultProviderState(),
     openai:    defaultProviderState(),
+    metamuse:  defaultProviderState(),
   });
   const [bedrockStatus, setBedrockStatus] = useState<{
     configured: boolean; region: string | null; model: string | null;
@@ -55,12 +56,13 @@ export function ApiKeySection({ onConnectedChange }: Props) {
       try {
         const stored = await fetchKeys(getToken);
         if (cancelled) return;
-        const saved: Record<"anthropic" | "openai", ProviderState> = {
+        const saved: Record<"anthropic" | "openai" | "metamuse", ProviderState> = {
           anthropic: defaultProviderState(),
           openai:    defaultProviderState(),
+          metamuse:  defaultProviderState(),
         };
         stored.forEach(k => {
-          if (k.provider === "anthropic" || k.provider === "openai") {
+          if (k.provider === "anthropic" || k.provider === "openai" || k.provider === "metamuse") {
             saved[k.provider] = {
               ...saved[k.provider],
               connected: true,
@@ -84,7 +86,7 @@ export function ApiKeySection({ onConnectedChange }: Props) {
     return () => { cancelled = true; };
   }, [getToken, toast]);
 
-  type KeyProvider = "anthropic" | "openai";
+  type KeyProvider = "anthropic" | "openai" | "metamuse";
 
   function update(provider: KeyProvider, patch: Partial<ProviderState>) {
     setStates(prev => ({ ...prev, [provider]: { ...prev[provider], ...patch } }));
@@ -115,7 +117,8 @@ export function ApiKeySection({ onConnectedChange }: Props) {
       showInput: false, keyInput: "",
     });
     onConnectedChange(provider, true);
-    toast(`${provider === "anthropic" ? "Anthropic" : "OpenAI"} API key verified and saved`);
+    const labels: Record<KeyProvider, string> = { anthropic: "Anthropic", openai: "OpenAI", metamuse: "Meta Muse" };
+    toast(`${labels[provider]} API key verified and saved`);
   }
 
   async function handleRemove(provider: KeyProvider) {
@@ -123,17 +126,19 @@ export function ApiKeySection({ onConnectedChange }: Props) {
     if (!ok) { toast("Failed to remove API key"); return; }
 
     if (activeProvider === provider) {
-      const other: KeyProvider = provider === "anthropic" ? "openai" : "anthropic";
-      if (states[other].connected) {
-        localStorage.setItem(ACTIVE_PROVIDER_KEY, other);
-        setActiveProvider(other);
+      const others: KeyProvider[] = provider === "anthropic" ? ["openai", "metamuse"] : provider === "openai" ? ["anthropic", "metamuse"] : ["anthropic", "openai"];
+      const connected = others.find(p => states[p].connected);
+      if (connected) {
+        localStorage.setItem(ACTIVE_PROVIDER_KEY, connected);
+        setActiveProvider(connected);
       } else {
         localStorage.removeItem(ACTIVE_PROVIDER_KEY);
       }
     }
     update(provider, { connected: false, maskedKey: "", lastVerified: "", showRemove: false });
     onConnectedChange(provider, false);
-    toast(`${provider === "anthropic" ? "Anthropic" : "OpenAI"} API key removed`);
+    const labels: Record<KeyProvider, string> = { anthropic: "Anthropic", openai: "OpenAI", metamuse: "Meta Muse" };
+    toast(`${labels[provider]} API key removed`);
   }
 
   function handleSetActiveProvider(provider: AIProvider) {
@@ -144,12 +149,12 @@ export function ApiKeySection({ onConnectedChange }: Props) {
     }
     localStorage.setItem(ACTIVE_PROVIDER_KEY, provider);
     setActiveProvider(provider);
-    const labels: Record<AIProvider, string> = { anthropic: "Anthropic Claude", openai: "OpenAI GPT-4o", bedrock: "Amazon Bedrock" };
+    const labels: Record<AIProvider, string> = { anthropic: "Anthropic Claude", openai: "OpenAI GPT-4o", bedrock: "Amazon Bedrock", metamuse: "Meta Muse" };
     toast(`Switched to ${labels[provider]}`);
   }
 
   const s = states[activeTab];
-  const providerLabel = activeTab === "anthropic" ? "Anthropic" : "OpenAI";
+  const providerLabel = activeTab === "anthropic" ? "Anthropic" : activeTab === "openai" ? "OpenAI" : "Meta Muse";
 
   return (
     <div className="max-w-[640px]">
@@ -167,9 +172,9 @@ export function ApiKeySection({ onConnectedChange }: Props) {
       </div>
 
       {/* Provider tabs */}
-      <Card title="API Keys" sub="Add keys for one or both providers. You can switch between them at any time.">
+      <Card title="API Keys" sub="Add keys for your preferred providers. You can switch between them at any time.">
         <div className="flex gap-1.5 mb-4">
-          {(["anthropic", "openai"] as const).map(p => (
+          {(["anthropic", "openai", "metamuse"] as const).map(p => (
             <button
               key={p}
               type="button"
@@ -178,7 +183,7 @@ export function ApiKeySection({ onConnectedChange }: Props) {
                 activeTab === p ? "bg-ink text-vellum border-ink" : "bg-white text-ink-muted border-vellum-border hover:text-ink"
               }`}
             >
-              {p === "anthropic" ? "Anthropic" : "OpenAI"}
+              {p === "anthropic" ? "Anthropic" : p === "openai" ? "OpenAI" : "Meta Muse"}
               {states[p].connected && (
                 <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#1D9E75" }} />
               )}
@@ -258,7 +263,7 @@ export function ApiKeySection({ onConnectedChange }: Props) {
                 value={s.keyInput}
                 onChange={e => update(activeTab, { keyInput: e.target.value, verifyError: null })}
                 onKeyDown={e => e.key === "Enter" && handleVerify(activeTab)}
-                placeholder={activeTab === "anthropic" ? "sk-ant-api03-..." : "sk-..."}
+                placeholder={activeTab === "anthropic" ? "sk-ant-api03-..." : activeTab === "openai" ? "sk-..." : "LLM_..."}
                 className="w-full px-3 py-2.5 border border-ink/15 rounded-lg text-[13px] bg-white text-ink font-mono focus:outline-none focus:border-ink/30"
               />
               {s.verifyError && (
@@ -269,9 +274,13 @@ export function ApiKeySection({ onConnectedChange }: Props) {
                   <>Get your key at{" "}
                     <a href="https://console.anthropic.com" target="_blank" rel="noreferrer" className="text-ink underline">console.anthropic.com</a>
                   </>
-                ) : (
+                ) : activeTab === "openai" ? (
                   <>Get your key at{" "}
                     <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="text-ink underline">platform.openai.com</a>
+                  </>
+                ) : (
+                  <>Get your key at{" "}
+                    <a href="https://meta.ai/api" target="_blank" rel="noreferrer" className="text-ink underline">meta.ai/api</a>
                   </>
                 )}
               </div>
@@ -303,7 +312,7 @@ export function ApiKeySection({ onConnectedChange }: Props) {
       {/* Active provider selector */}
       <Card title="Active provider" sub="Which AI powers your planning interview.">
         <div className="flex flex-col gap-2">
-          {(["anthropic", "openai"] as ("anthropic" | "openai")[]).map(p => {
+          {(["anthropic", "openai", "metamuse"] as ("anthropic" | "openai" | "metamuse")[]).map(p => {
             const connected = states[p].connected;
             const isActive  = activeProvider === p;
             return (
@@ -322,7 +331,7 @@ export function ApiKeySection({ onConnectedChange }: Props) {
               >
                 <div>
                   <div className="text-[13px] font-medium text-ink">
-                    {p === "anthropic" ? "Anthropic Claude" : "OpenAI"}
+                    {p === "anthropic" ? "Anthropic Claude" : p === "openai" ? "OpenAI" : "Meta Muse"}
                   </div>
                   <div className="text-[11px] text-ink-faint mt-0.5">
                     {`${PROVIDER_MODELS[p].label} · ${PROVIDER_MODELS[p].default}`}
@@ -396,8 +405,10 @@ export function ApiKeySection({ onConnectedChange }: Props) {
         <div className="text-[11px] text-ink-faint mt-3">
           DevDocs AI doesn&apos;t track your API usage or costs. Monitor usage in the{" "}
           <a href="https://console.anthropic.com" target="_blank" rel="noreferrer" className="text-ink underline">Anthropic Console</a>
-          {" "}or{" "}
+          {", "}
           <a href="https://platform.openai.com/usage" target="_blank" rel="noreferrer" className="text-ink underline">OpenAI dashboard</a>
+          {", or "}
+          <a href="https://meta.ai/api" target="_blank" rel="noreferrer" className="text-ink underline">Meta Muse portal</a>
           .
         </div>
       </Card>

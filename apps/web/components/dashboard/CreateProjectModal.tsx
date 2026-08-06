@@ -98,13 +98,17 @@ export function CreateProjectModal({ open, onClose, onCreate, creating }: Props)
     const key = keyInput.trim();
     if (!key) return;
 
-    const prefix = provider === "anthropic" ? "sk-ant-" : "sk-";
+    const prefix = provider === "anthropic" ? "sk-ant-" : provider === "metamuse" ? "LLM_" : "sk-";
     if (key.length < 20) {
       setVerifyError("That doesn’t look like a valid API key. Keys are usually 40+ characters.");
       return;
     }
-    if (!key.startsWith(prefix) && provider === "anthropic") {
+    if (provider === "anthropic" && !key.startsWith("sk-ant-")) {
       setVerifyError("Anthropic keys start with sk-ant-. Double-check you copied the full key.");
+      return;
+    }
+    if (provider === "metamuse" && !key.startsWith("LLM_")) {
+      setVerifyError("Meta Muse keys start with LLM_. Double-check you copied the full key.");
       return;
     }
 
@@ -141,7 +145,7 @@ export function CreateProjectModal({ open, onClose, onCreate, creating }: Props)
             <div className="mb-4">
               <label className="block text-[13px] font-medium text-ink mb-1.5">Provider</label>
               <div className="flex gap-2">
-                {(["anthropic", "openai"] as AIProvider[]).map(p => (
+                {(["anthropic", "openai", "metamuse"] as AIProvider[]).map(p => (
                   <button
                     key={p}
                     type="button"
@@ -153,7 +157,7 @@ export function CreateProjectModal({ open, onClose, onCreate, creating }: Props)
                         : "border-vellum-border bg-white text-ink-muted hover:border-ink"
                     )}
                   >
-                    {p === "anthropic" ? "Anthropic" : "OpenAI"}
+                    {p === "anthropic" ? "Anthropic" : p === "openai" ? "OpenAI" : "Meta Muse"}
                   </button>
                 ))}
                 {bedrockStatus?.configured && (
@@ -186,14 +190,14 @@ export function CreateProjectModal({ open, onClose, onCreate, creating }: Props)
                 {/* Key input */}
                 <div className="mb-1">
                   <label className="block text-[13px] font-medium text-ink mb-1.5">
-                    {provider === "anthropic" ? "Anthropic" : "OpenAI"} API key
+                    {provider === "anthropic" ? "Anthropic" : provider === "openai" ? "OpenAI" : "Meta Muse"} API key
                   </label>
                   <input
                     type="text"
                     value={keyInput}
                     onChange={e => { setKeyInput(e.target.value); setVerifyError(null); }}
                     onKeyDown={e => e.key === "Enter" && handleVerifyAndCreate()}
-                    placeholder={provider === "anthropic" ? "sk-ant-api03-..." : "sk-..."}
+                    placeholder={provider === "anthropic" ? "sk-ant-api03-..." : provider === "openai" ? "sk-..." : "LLM_..."}
                     className="w-full px-3 py-2.5 border border-ink/15 rounded-vellum text-[13px] bg-white text-ink font-mono focus:outline-none focus:border-ink/30"
                   />
                   {verifyError && (
@@ -204,9 +208,13 @@ export function CreateProjectModal({ open, onClose, onCreate, creating }: Props)
                       <>Get your key at{" "}
                         <a href="https://console.anthropic.com" target="_blank" rel="noreferrer" className="text-ink underline">console.anthropic.com</a>
                       </>
-                    ) : (
+                    ) : provider === "openai" ? (
                       <>Get your key at{" "}
                         <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="text-ink underline">platform.openai.com</a>
+                      </>
+                    ) : (
+                      <>Get your key at{" "}
+                        <a href="https://meta.ai/api" target="_blank" rel="noreferrer" className="text-ink underline">meta.ai/api</a>
                       </>
                     )}
                   </div>

@@ -26,6 +26,8 @@ export function streamAIResponse(
     streamAnthropic(systemPrompt, userMessage, config, callbacks, signal);
   } else if (config.provider === "bedrock") {
     streamBedrock(systemPrompt, userMessage, config, callbacks, signal);
+  } else if (config.provider === "metamuse") {
+    streamMetaMuse(systemPrompt, userMessage, config, callbacks, signal);
   } else {
     streamOpenAI(systemPrompt, userMessage, config, callbacks, signal);
   }
@@ -106,6 +108,49 @@ async function streamOpenAI(
   }
 }
 
+async function streamMetaMuse(
+  systemPrompt: string,
+  userMessage:  string,
+  config:       AIConfig,
+  callbacks:    StreamCallbacks,
+  signal?:      AbortSignal
+) {
+  try {
+    const OpenAI = (await import("openai")).default;
+    const client = new OpenAI({
+      apiKey: config.apiKey,
+      baseURL: "https://api.meta.ai/v1",
+    });
+    let accumulated = "";
+
+    const stream = await client.chat.completions.create(
+      {
+        model:      config.model,
+        max_tokens: 2000,
+        stream:     true,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user",   content: userMessage  },
+        ],
+      },
+      { signal }
+    );
+
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content ?? "";
+      if (delta) {
+        accumulated += delta;
+        callbacks.onToken(accumulated);
+      }
+    }
+
+    callbacks.onDone(accumulated);
+  } catch (err: unknown) {
+    if (isAbort(err)) return;
+    callbacks.onError(...mapMetaMuseError(err));
+  }
+}
+
 async function streamBedrock(
   systemPrompt: string,
   userMessage:  string,
@@ -182,4 +227,15 @@ function mapBedrockError(err: unknown): ErrorTuple {
   if (msg.includes("ValidationException") && msg.includes("model"))
     return ["unknown",    "Model not available. Enable it in the AWS Bedrock console."];
   return ["unknown", `Bedrock error: ${msg}`];
+}
+
+function mapMetaMuseError(err: unknown): ErrorTuple {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (msg.includes("401") || msg.includes("Incorrect API key"))
+    return ["auth",       "Meta Muse API key invalid or revoked."];
+  if (msg.includes("429") || msg.includes("rate"))
+    return ["rate_limit", "Meta Muse rate limit reached. Wait and retry."];
+  if (msg.includes("fetch") || msg.includes("network"))
+    return ["network",    "Network error reaching Meta Muse."];
+  return ["unknown", `Meta Muse error: ${msg}`];
 }

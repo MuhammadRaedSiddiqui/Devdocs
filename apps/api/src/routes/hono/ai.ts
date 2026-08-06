@@ -11,6 +11,7 @@ const models: Record<AIProvider, string> = {
   anthropic: 'claude-sonnet-4-6',
   openai: 'gpt-4o',
   bedrock: process.env.AWS_BEDROCK_MODEL ?? PROVIDER_MODELS.bedrock.default,
+  metamuse: 'muse-spark-1.1',
 };
 
 // Per-user/provider AI generation limit: 20 requests per minute.

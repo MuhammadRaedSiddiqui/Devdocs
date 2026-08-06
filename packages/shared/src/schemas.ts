@@ -12,7 +12,7 @@ export const StreamRequestSchema = z.object({
     "auth", "testing", "monitoring", "frontend", "deployment",
   ]),
   userMessage: z.string().min(1, "Message cannot be empty").max(4000, "Message too long"),
-  provider:    z.enum(["anthropic", "openai", "bedrock"]).default("anthropic"),
+  provider:    z.enum(["anthropic", "openai", "bedrock", "metamuse"]).default("anthropic"),
 });
 
 export type StreamRequest = z.infer<typeof StreamRequestSchema>;
@@ -43,14 +43,14 @@ export type ProjectUpdate = z.infer<typeof ProjectUpdateSchema>;
 
 // ── API keys ──────────────────────────────────────────────────────────────────
 export const ApiKeyUpsertSchema = z.object({
-  provider: z.enum(["anthropic", "openai"]),
+  provider: z.enum(["anthropic", "openai", "metamuse"]),
   key:      z.string().min(10, "Key too short"),
 });
 
 export type ApiKeyUpsert = z.infer<typeof ApiKeyUpsertSchema>;
 
 export const ApiKeyResponseSchema = z.object({
-  provider:   z.enum(["anthropic", "openai"]),
+  provider:   z.enum(["anthropic", "openai", "metamuse"]),
   maskedKey:  z.string(),
   createdAt:  z.string(),
 });

@@ -1,4 +1,4 @@
-export type AIProvider = 'anthropic' | 'openai' | 'bedrock';
+export type AIProvider = 'anthropic' | 'openai' | 'bedrock' | 'metamuse';
 
 export interface AIProviderConfig {
   provider: AIProvider;
@@ -7,9 +7,10 @@ export interface AIProviderConfig {
 }
 
 export const PROVIDER_MODELS: Record<AIProvider, { default: string; label: string }> = {
-  anthropic: { default: 'claude-sonnet-4-8', label: 'Claude Sonnet 4.8' },
+  anthropic: { default: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
   openai: { default: 'gpt-4o', label: 'GPT-4o' },
   bedrock: { default: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0', label: 'Claude via Bedrock' },
+  metamuse: { default: 'muse-spark-1.1', label: 'Muse Spark 1.1' },
 };
 
 export const ACTIVE_PROVIDER_KEY = 'devdocs_active_provider';
