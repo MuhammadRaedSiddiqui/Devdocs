@@ -42,16 +42,24 @@ export interface InterviewMessage {
 }
 
 export interface MessageMetadata {
-  // Card selections made in this message
+  // User message metadata - Card selections made in this message
   cardChoices?: Record<string, string>;
 
-  // Schema actions performed
+  // User message metadata - Schema actions performed
   schemaAction?: {
     type: "add_field" | "confirm_schema";
     table?: string;
     field?: string;
     fieldType?: string;
   };
+
+  // Assistant message metadata - Message type classification
+  messageType?: "completion" | "opener" | "card_picker" | "schema_builder" | "follow-up";
+
+  // Assistant message metadata - Flags
+  isOpener?: boolean;
+  showsCardPicker?: boolean;
+  showsSchemaBuilder?: boolean;
 
   // Domain transitions
   domainTransition?: {

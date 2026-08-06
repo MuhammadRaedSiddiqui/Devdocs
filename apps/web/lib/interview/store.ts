@@ -200,10 +200,15 @@ function runReply(
           clearTimeout(timeoutId);
           const s = get();
 
-          // Extract metadata from msgOpts for logging
+          // Extract metadata for assistant message logging
           const metadata: MessageMetadata = {
-            cardChoices: msgOpts.showCards ? s.lockedChoices[msgOpts.showCards] : undefined,
-            schemaAction: msgOpts.showSchema ? { type: "confirm_schema" } : undefined,
+            messageType: msgOpts.isComplete ? "completion" :
+                        isInternalOpener ? "opener" :
+                        msgOpts.showCards ? "card_picker" :
+                        msgOpts.showSchema ? "schema_builder" : "follow-up",
+            isOpener: isInternalOpener,
+            showsCardPicker: msgOpts.showCards !== undefined,
+            showsSchemaBuilder: msgOpts.showSchema !== undefined,
           };
 
           // Log assistant message with timing data
