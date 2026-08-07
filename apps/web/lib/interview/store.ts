@@ -117,6 +117,10 @@ type S = InterviewState;
 type SetFn = (p: Partial<S> | ((s: S) => Partial<S>)) => void;
 type GetFn = () => S;
 
+interface RunReplyOptions {
+  onComplete?: (aiContent: string) => void;
+}
+
 // ── Core reply function ───────────────────────────────────────────────────────
 // This is the only place in the store that calls the AI.
 // For openers and help responses we pass the opener text directly as userMessage;
@@ -126,11 +130,16 @@ function runReply(
   get: GetFn,
   userMessage:  string,
   msgOpts:      Partial<ChatMessage>,
-  onDone?:      () => void,
+  options?:     RunReplyOptions | (() => void),
   // When true, the userMessage is an internal opener, not a real user turn —
   // it goes into the system prompt context but not into the messages array.
   isInternalOpener = false
 ) {
+  // Backwards compatibility: if options is a function, treat it as onComplete
+  const opts: RunReplyOptions = typeof options === 'function' 
+    ? { onComplete: options } 
+    : (options ?? {});
+  const onDoneLegacy = typeof options === 'function' ? options : undefined;
   const config = getActiveConfig();
 
   // No API key — show a friendly inline message and stop
@@ -223,7 +232,12 @@ function runReply(
             messages:        [...s.messages, { role: "assistant" as const, content: full, ...msgOpts }],
             messageCount:    s.messageCount + 1,
           }));
-          onDone?.();
+          // CRITICAL FIX #1: Pass AI-generated content to completion handler
+          if (opts.onComplete) {
+            opts.onComplete(full);
+          } else if (onDoneLegacy) {
+            onDoneLegacy();
+          }
         },
 
         onError: (type, message) => {
@@ -259,8 +273,13 @@ function runOpener(set: SetFn, get: GetFn, domainId: DomainId) {
   runReply(set, get, opener, opts, undefined, true);
 }
 
-function completeDomain(set: SetFn, get: GetFn, domainId: DomainId) {
-  const content = generateDoc(domainId, get().lockedContext!, get().lockedChoices, get().elaboration);
+function completeDomain(set: SetFn, get: GetFn, domainId: DomainId, aiGeneratedContent?: string) {
+  // CRITICAL FIX #1: Use AI-generated content if available, otherwise fall back to template
+  // This ensures the excellent, specific content from the AI reaches DOCUMENTATION.md
+  const content = aiGeneratedContent && aiGeneratedContent.trim().length > 0
+    ? aiGeneratedContent
+    : generateDoc(domainId, get().lockedContext!, get().lockedChoices, get().elaboration);
+  
   set(s => ({
     domainContent:    { ...s.domainContent, [domainId]: content },
     completedDomains: s.completedDomains.includes(domainId)
@@ -280,9 +299,23 @@ function completeDomain(set: SetFn, get: GetFn, domainId: DomainId) {
     });
   }
 
+  // CRITICAL FIX #3: Gate completion on all active domains having non-empty content
   const active = get().activeDomains;
+  const allActiveComplete = active.every(d => {
+    const phase = get().domainPhases[d.id];
+    return phase === "complete";
+  });
+  
+  // Check if any active domain has empty content
+  const hasEmptyContent = active.some(d => {
+    const phase = get().domainPhases[d.id];
+    if (phase !== "complete") return false; // Not yet completed, skip
+    const docContent = get().domainContent[d.id];
+    return !docContent || docContent.trim().length === 0;
+  });
+
   const next = nextDomainId(domainId, active);
-  if (!next) {
+  if (!next && allActiveComplete && !hasEmptyContent) {
     set({ isComplete: true });
 
     // End the session when interview is complete
@@ -298,6 +331,11 @@ function completeDomain(set: SetFn, get: GetFn, domainId: DomainId) {
       undefined,
       true
     );
+    return;
+  } else if (!next && hasEmptyContent) {
+    // Some domains have empty content - don't mark as complete
+    console.warn('Interview cannot complete: some domains have empty content');
+    set({ isComplete: false });
     return;
   }
   set({ currentDomain: next });
@@ -415,7 +453,7 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
       set, get,
       `The user selected "${label}" for ${domainLabel}. Acknowledge the choice briefly (one sentence) and generate the ${domainLabel} documentation section.`,
       {},
-      () => completeDomain(set, get, domain),
+      { onComplete: (aiContent) => completeDomain(set, get, domain, aiContent) },
       true
     );
   },
@@ -447,11 +485,11 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
           set, get,
           `The user described their project: "${text}". Briefly acknowledge this (1-2 sentences), then generate the Planning & Scope documentation section.`,
           {},
-          () => completeDomain(set, get, "planning"),
+          { onComplete: (aiContent) => completeDomain(set, get, "planning", aiContent) },
           true
         );
       } else {
-        runReply(set, get, text, {}, () => completeDomain(set, get, domain));
+        runReply(set, get, text, {}, { onComplete: (aiContent) => completeDomain(set, get, domain, aiContent) });
       }
 
     } else if (d.mode === "schema") {
@@ -490,7 +528,7 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
       set, get,
       "The user confirmed the database schema. Acknowledge it (one sentence) and generate the Database Design documentation section.",
       {},
-      () => completeDomain(set, get, "database"),
+      { onComplete: (aiContent) => completeDomain(set, get, "database", aiContent) },
       true
     );
   },
