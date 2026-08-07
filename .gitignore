@@ -1,37 +1,87 @@
+```gitignore
 # Dependencies
 node_modules/
-.pnp
-.pnp.js
 
 # Build outputs
-.next/
-out/
 dist/
 build/
+.next/
+out/
 
-# Turbo
-.turbo/
-
-# Environment
-.env
+# Environment variables
 .env.local
-.env.*.local
+.env.*
 
-# Vercel
-.vercel
-
-# TypeScript
-*.tsbuildinfo
-next-env.d.ts
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Editor
-.idea/
+# IDE files
 .vscode/
+.idea/
 *.swp
+*.swo
 
 # Logs
 *.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git/
+.mypy_cache/
+.pytest_cache/
+.hypothesis/
+
+# Temporary files
+*.tmp
+*.temp
+*~
+.DS_Store
+Thumbs.db
+
+# Compiled files
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.a
+*.out
+*.class
+
+# Compressed files
+*.zip
+*.gz
+*.tar
+*.tgz
+*.bz2
+*.xz
+*.7z
+*.rar
+*.Z
+*.lz
+*.lzo
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.zst
+*.lz4
+*.lzh
+*.cab
+*.arj
+*.rpm
+*.deb
+```
