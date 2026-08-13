@@ -9,7 +9,7 @@ const EXCEPT_LANDING: ProjectType[] = ["saas", "api", "internal_tool", "mobile",
 export const DOMAINS: DomainDefinition[] = [
   { id: "planning",     label: "Planning & Scope",  file: "PLANNING.md",       mode: "open",   relevantFor: ALL_TYPES },
   { id: "architecture", label: "Architecture",       file: "ARCHITECTURE.md",   mode: "cards",  requiredChoiceKey: "pattern",            relevantFor: ALL_TYPES },
-  { id: "database",     label: "Database Design",    file: "DATABASE.md",       mode: "schema",                                          relevantFor: EXCEPT_LANDING },
+  { id: "database",     label: "Database",           file: "DATABASE.md",       mode: "cards",  requiredChoiceKey: "databasePlatform",   relevantFor: EXCEPT_LANDING },
   { id: "api",          label: "API Contracts",      file: "API-CONTRACTS.md",  mode: "open",                                            relevantFor: ["saas", "api", "mobile", "other"] },
   { id: "environment",  label: "Env Strategy",       file: "ENV-STRATEGY.md",   mode: "cards",  requiredChoiceKey: "envStrategy",        relevantFor: EXCEPT_LANDING },
   { id: "auth",         label: "Authentication",     file: "AUTH.md",           mode: "cards",  requiredChoiceKey: "authProvider",       relevantFor: EXCEPT_LANDING },
@@ -43,8 +43,8 @@ export function getOpener(domainId: DomainId, ctx: ProjectContext, elaboration: 
     case "planning":
       return `I've got your setup: ${typeLabel}, ${fmtTeam(ctx)} team, ${fmtTimeline(ctx)} timeline, ${ctx.budget} budget.\n\nNow tell me about the project itself — what does it do, who is it for, and what's the core thing a user does in it? The more detail you give me here, the more specific I can be in every domain that follows.`;
     case "architecture": return "Now let's pick your architecture pattern.";
-    case "database":     return "Good. Based on your description I've drafted a starting schema. Look through it — add or remove fields — then click **Looks good** to lock it in.";
-    case "api":          return "Schema locked. List the main actions your app needs — things like 'users sign up', 'users create a project'. I'll convert these into endpoints.";
+    case "database":     return "Choose where your app's information will live. I'll handle the technical setup details in your documentation.";
+    case "api":          return "Database choice saved. List the main actions your app needs — things like 'users sign up', 'users create a project'. I'll convert these into endpoints.";
     case "environment":  return "Let's lock in your environment strategy.";
     case "auth":         return "Now authentication. Which provider fits your stack?";
     case "testing":      return "Testing strategy next.";
@@ -69,7 +69,7 @@ export function generateDoc(
   switch (domainId) {
     case "planning":      return `## Planning & Scope\n\n**Project:** ${tl} · ${team} team · ${timeline} · ${budget}\n\n**Description:** ${elaboration || "(provided during interview)"}\n\n**MVP:** Core user action that delivers value. Everything else deferred to v2.\n\n**Success:** 10 active users in week 1. Core action succeeds 80%+ of attempts.`;
     case "architecture":  return `## Architecture\n\n**Pattern:** ${choiceLabel("architecture","pattern") ?? "Monolith"}\n\n**Rationale:** ${team} team on a ${timeline} timeline. Microservices add 4-6 weeks overhead before first feature ships.\n\n**Scale trigger:** Extract services when team > 4 or a component needs independent scaling.`;
-    case "database":      return `## Database Design\n\n**Choice:** PostgreSQL — relational, ACID, best ORM support.\n\n**Schema:** core entities use soft deletes (\`deleted_at\`) and UUID primary keys.\n\n**Migrations:** every schema change ships as a committed migration file.`;
+    case "database":      return `## Database\n\n**Platform:** ${choiceLabel("database", "databasePlatform") ?? "Managed PostgreSQL"}\n\n**Approach:** Start with a managed service so backups, access control, and growth are handled without extra infrastructure work.\n\n**Data model:** Define the app's records as features are built; keep customer data private and exportable.`;
     case "api":           return `## API Contracts\n\n**Style:** REST\n\n**Convention:** resource-based routes, versioned under \`/v1\`. Auth required on all routes except \`/health\`.\n\n**Pagination:** cursor-based for all list endpoints.`;
     case "environment":   return `## Environment Strategy\n\n**Setup:** ${choiceLabel("environment","envStrategy") ?? "Local + Staging + Production"}.\n\n**Secrets:** encrypted environment variables — never committed to version control.\n\n**CI gates:** type-check, lint, and tests must pass before any staging deploy.`;
     case "auth":          return `## Authentication\n\n**Provider:** ${choiceLabel("auth","authProvider") ?? "Supabase Auth"}\n\n**Strategy:** email + OAuth, JWT in httpOnly cookie. Row Level Security at the database layer.`;

@@ -4,15 +4,32 @@
 // for TypeScript types in apps/web fetch helpers — no duplication.
 import { z } from "zod";
 
+export const DomainIdSchema = z.enum([
+  "planning", "architecture", "database", "api", "environment",
+  "auth", "testing", "monitoring", "frontend", "deployment",
+]);
+
+export const ProjectContextSchema = z.object({
+  projectType: z.enum(["saas", "api", "internal_tool", "mobile", "landing_page", "other"]),
+  teamSize: z.enum(["solo", "small", "medium", "large"]),
+  timeline: z.enum(["under_1_month", "1_3_months", "3_6_months", "6_plus_months"]),
+  budget: z.enum(["bootstrapped", "self_funded", "funded"]),
+  experienceLevel: z.enum(["beginner", "intermediate", "experienced"]),
+});
+
 // ── AI streaming ──────────────────────────────────────────────────────────────
 export const StreamRequestSchema = z.object({
   projectId:   z.string().uuid("projectId must be a valid UUID"),
-  domainId:    z.enum([
-    "planning", "architecture", "database", "api", "environment",
-    "auth", "testing", "monitoring", "frontend", "deployment",
-  ]),
+  domainId:    DomainIdSchema,
   userMessage: z.string().min(1, "Message cannot be empty").max(4000, "Message too long"),
   provider:    z.enum(["anthropic", "openai", "bedrock", "metamuse"]).default("anthropic"),
+  // `interview` is required for new clients; optional for backward-compat with
+  // older deployed web builds that still rely on server-side interview_data.
+  interview: z.object({
+    lockedContext: ProjectContextSchema,
+    lockedChoices: z.record(z.record(z.string())).default({}),
+    elaboration: z.string().max(4000).default(""),
+  }).optional(),
 });
 
 export type StreamRequest = z.infer<typeof StreamRequestSchema>;

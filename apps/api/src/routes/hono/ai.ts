@@ -41,6 +41,22 @@ app.post('/stream', async (c) => {
   });
   if (!project) return c.json({ error: 'not_found', message: 'Project not found.' }, 404);
 
+  let interview = parsed.data.interview as
+    | { lockedContext: Parameters<typeof buildSystemPrompt>[0]; lockedChoices: Parameters<typeof buildSystemPrompt>[3]; elaboration: string }
+    | undefined;
+  // Backward-compat: older web builds omit `interview` — fall back to DB.
+  if (!interview) {
+    const raw = (project.interviewData ?? {}) as Record<string, unknown>;
+    if (!raw.lockedContext) {
+      return c.json({ error: 'validation_error', message: 'Interview context missing. Please refresh and restart the interview step.' }, 400);
+    }
+    interview = {
+      lockedContext: raw.lockedContext as Parameters<typeof buildSystemPrompt>[0],
+      lockedChoices: (raw.lockedChoices as Parameters<typeof buildSystemPrompt>[3]) ?? {},
+      elaboration: (raw.elaboration as string) ?? '',
+    };
+  }
+
   // Per-user/provider rate limit — applied after ownership is confirmed so that
   // unauthorized probes don't consume a legitimate user's budget.
   const limit = await checkRateLimit(`ai:stream:${userId}:${provider}`, AI_RATE_LIMIT, AI_RATE_WINDOW_SEC);
@@ -66,17 +82,6 @@ app.post('/stream', async (c) => {
     apiKey = key;
     model = models[provider];
   }
-  let data = (project.interviewData ?? {}) as Record<string, unknown>;
-  if (!data.lockedContext) {
-    // Race condition: client may have just saved lockedContext — retry once after a brief wait
-    await new Promise(r => setTimeout(r, 1500));
-    const retry = await db.query.projects.findFirst({
-      where: and(eq(projects.id, projectId), eq(projects.userId, userId)),
-    });
-    data = ((retry?.interviewData ?? {}) as Record<string, unknown>);
-    if (!data.lockedContext) return c.json({ error: 'invalid_project', message: 'Complete project discovery first.' }, 400);
-  }
-
   const encoder = new TextEncoder();
   const abort = new AbortController();
   c.req.raw.signal.addEventListener('abort', () => abort.abort(), { once: true });
@@ -88,7 +93,12 @@ app.post('/stream', async (c) => {
       };
       const close = () => { if (!closed) { closed = true; controller.close(); } };
       const timeout = setTimeout(() => { abort.abort(); send({ type: 'error', errorType: 'timeout', message: 'Request timed out after 30 seconds.' }); close(); }, 30_000);
-      const prompt = buildSystemPrompt(data.lockedContext as Parameters<typeof buildSystemPrompt>[0], domainId, (data.elaboration as string) ?? '', (data.lockedChoices as Parameters<typeof buildSystemPrompt>[3]) ?? {});
+      const prompt = buildSystemPrompt(
+        interview.lockedContext,
+        domainId,
+        interview.elaboration,
+        interview.lockedChoices,
+      );
       streamAIResponse(prompt, userMessage, {
         provider,
         apiKey,

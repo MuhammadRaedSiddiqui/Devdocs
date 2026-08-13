@@ -3,11 +3,10 @@
 // Integration point remaining: persistToSupabase() (see prompt 3).
 import { create } from "zustand";
 import type { ChatMessage, DomainDefinition, DomainId, DomainPhase, ProjectContext, SchemaTables } from "@/lib/types";
-import { DOMAINS, getActiveDomains, getOpener, generateDoc, buildFullDocument, nextDomainId } from "@/lib/interview/domains";
+import { DOMAINS, getActiveDomains, getOpener, buildFullDocument, nextDomainId } from "@/lib/interview/domains";
 import { CARD_CHOICES } from "@/lib/interview/choices";
 import { getActiveConfig, type AIProvider } from "@/lib/ai/provider";
 import { streamAIResponse, type StreamErrorType } from "@/lib/ai/stream";
-import { buildSystemPrompt } from "@/lib/ai/systemPrompt";
 import { SessionLogger } from "@/lib/session/logger";
 import type { MessageMetadata } from "@devdocs/shared";
 
@@ -101,6 +100,8 @@ interface InterviewState {
     domainContent:       Partial<Record<DomainId, string>>;
     conversationHistory: ChatMessage[];
     elaboration:         string;
+    schemaTables?:       SchemaTables;
+    schemaConfirmed?:    boolean;
   }) => void;
   reset: () => void;
 }
@@ -126,10 +127,11 @@ function runReply(
   get: GetFn,
   userMessage:  string,
   msgOpts:      Partial<ChatMessage>,
-  onDone?:      () => void,
+  onDone?:      (full: string) => void,
   // When true, the userMessage is an internal opener, not a real user turn —
   // it goes into the system prompt context but not into the messages array.
-  isInternalOpener = false
+  isInternalOpener = false,
+  domainId?: DomainId,
 ) {
   const config = getActiveConfig();
 
@@ -145,23 +147,17 @@ function runReply(
 
   // Start timing tracking for session logging
   const state = get();
+  const responseDomain = domainId ?? state.currentDomain;
   if (state.sessionLogger) {
     state.sessionLogger.startThinking();
   }
-
-  // Build context-aware system prompt from current store state
-  const systemPrompt = buildSystemPrompt(
-    state.lockedContext!,
-    state.currentDomain,
-    state.elaboration,
-    state.lockedChoices
-  );
 
   const controller = new AbortController();
   set({ abortController: controller });
 
   // 30-second timeout
   const timeoutId = setTimeout(() => {
+    if (get().abortController !== controller) return;
     controller.abort();
     const errMsg = ERROR_MESSAGES.timeout;
     const s = get();
@@ -176,11 +172,13 @@ function runReply(
       abortController: null,
       lastError: { type: "timeout", message: errMsg, lastUserMessage: userMessage },
       messages: [...s.messages, { role: "assistant" as const, content: errMsg }],
+      messageCount: s.messageCount + 1,
     }));
   }, 30_000);
 
   // Short thinking delay for UX (gives the dots animation time to appear)
   setTimeout(() => {
+    if (controller.signal.aborted || get().abortController !== controller) return;
     const s = get();
     set({ isThinking: false, isStreaming: true, streamingText: "" });
 
@@ -190,15 +188,34 @@ function runReply(
     }
 
     streamAIResponse(
-      systemPrompt,
       userMessage,
-      { ...config, domainId: state.currentDomain },
+      { ...config, domainId: responseDomain },
+      {
+        lockedContext: state.lockedContext!,
+        lockedChoices: state.lockedChoices,
+        elaboration: state.elaboration,
+      },
       {
         onToken: (acc) => set({ streamingText: acc }),
 
         onDone: (full) => {
           clearTimeout(timeoutId);
           const s = get();
+          const content = full.trim();
+
+          // Providers can finish a stream without emitting text. Do not persist
+          // an empty chat bubble; surface a retryable error instead.
+          if (!content) {
+            const message = "The AI response was empty. Please try again.";
+            set({
+              isThinking: false,
+              isStreaming: false,
+              streamingText: "",
+              abortController: null,
+              lastError: { type: "unknown", message, lastUserMessage: userMessage },
+            });
+            return;
+          }
 
           // Extract metadata for assistant message logging
           const metadata: MessageMetadata = {
@@ -213,17 +230,17 @@ function runReply(
 
           // Log assistant message with timing data
           if (s.sessionLogger && s.currentProvider) {
-            s.sessionLogger.logAssistantMessage(full, s.currentDomain, s.currentProvider, null, metadata);
+            s.sessionLogger.logAssistantMessage(content, responseDomain, s.currentProvider, null, metadata);
           }
 
           set(s => ({
             isStreaming:     false,
             streamingText:   "",
             abortController: null,
-            messages:        [...s.messages, { role: "assistant" as const, content: full, ...msgOpts }],
+            messages:        [...s.messages, { role: "assistant" as const, content, ...msgOpts }],
             messageCount:    s.messageCount + 1,
           }));
-          onDone?.();
+          onDone?.(content);
         },
 
         onError: (type, message) => {
@@ -232,7 +249,7 @@ function runReply(
 
           // Log error message
           if (s.sessionLogger && s.currentProvider) {
-            s.sessionLogger.logAssistantMessage(message, s.currentDomain, s.currentProvider, type);
+            s.sessionLogger.logAssistantMessage(message, responseDomain, s.currentProvider, type);
           }
 
           set(s => ({
@@ -242,6 +259,7 @@ function runReply(
             abortController: null,
             lastError:       { type, message, lastUserMessage: userMessage },
             messages:        [...s.messages, { role: "assistant" as const, content: message }],
+            messageCount:    s.messageCount + 1,
           }));
         },
       },
@@ -259,8 +277,7 @@ function runOpener(set: SetFn, get: GetFn, domainId: DomainId) {
   runReply(set, get, opener, opts, undefined, true);
 }
 
-function completeDomain(set: SetFn, get: GetFn, domainId: DomainId) {
-  const content = generateDoc(domainId, get().lockedContext!, get().lockedChoices, get().elaboration);
+function completeDomain(set: SetFn, get: GetFn, domainId: DomainId, content: string) {
   set(s => ({
     domainContent:    { ...s.domainContent, [domainId]: content },
     completedDomains: s.completedDomains.includes(domainId)
@@ -274,7 +291,7 @@ function completeDomain(set: SetFn, get: GetFn, domainId: DomainId) {
   const state = get();
   if (state.sessionLogger) {
     state.sessionLogger.updateSession({
-      totalDomainsCompleted: state.completedDomains.length + 1,
+      totalDomainsCompleted: state.completedDomains.length,
       totalMessages: state.messageCount,
       primaryProvider: state.currentProvider ?? undefined,
     });
@@ -285,17 +302,20 @@ function completeDomain(set: SetFn, get: GetFn, domainId: DomainId) {
   if (!next) {
     set({ isComplete: true });
 
-    // End the session when interview is complete
-    const finalState = get();
-    if (finalState.sessionLogger) {
-      finalState.sessionLogger.endSession(true);
-    }
-
     runReply(
       set, get,
       "Generate the final completion message for the interview.",
       { isComplete: true, showDownload: true },
-      undefined,
+      () => {
+        const finalState = get();
+        if (finalState.sessionLogger) {
+          void finalState.sessionLogger.endSession(true, {
+            totalMessages: finalState.messageCount,
+            totalDomainsCompleted: finalState.completedDomains.length,
+            primaryProvider: finalState.currentProvider ?? undefined,
+          });
+        }
+      },
       true
     );
     return;
@@ -352,9 +372,10 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
       return;
     }
 
+    const projectId = state.projectId;
     const logger = new SessionLogger(tokenGetter);
     const sessionId = await logger.startSession({
-      projectId: state.projectId,
+      projectId,
       metadata: {
         projectType: state.lockedContext.projectType,
         activeDomains: state.activeDomains.map(d => d.id),
@@ -366,6 +387,10 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
     });
 
     if (sessionId) {
+      if (get().projectId !== projectId) {
+        void logger.endSession(false);
+        return;
+      }
       set({ sessionLogger: logger });
       console.log('Session logging initialized:', sessionId);
     } else {
@@ -382,14 +407,15 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
       domainPhases: { ...s.domainPhases, [active[0].id]: "interviewing" },
     }));
 
-    // Initialize session logging immediately when context is first locked
-    const state = get();
-    if (!state.sessionLogger && state.projectId && state.tokenGetter) {
-      console.log('Initializing session on context lock');
-      state.initializeSession();
-    }
-
-    runOpener(set, get, active[0].id);
+    void (async () => {
+      const state = get();
+      const projectId = state.projectId;
+      if (!state.sessionLogger && state.projectId && state.tokenGetter) {
+        await state.initializeSession();
+      }
+      if (get().projectId !== projectId || get().lockedContext !== ctx) return;
+      runOpener(set, get, active[0].id);
+    })();
   },
 
   lockDomainChoice: (domain, key, value) => {
@@ -415,7 +441,7 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
       set, get,
       `The user selected "${label}" for ${domainLabel}. Acknowledge the choice briefly (one sentence) and generate the ${domainLabel} documentation section.`,
       {},
-      () => completeDomain(set, get, domain),
+      (content) => completeDomain(set, get, domain, content),
       true
     );
   },
@@ -447,11 +473,11 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
           set, get,
           `The user described their project: "${text}". Briefly acknowledge this (1-2 sentences), then generate the Planning & Scope documentation section.`,
           {},
-          () => completeDomain(set, get, "planning"),
+          (content) => completeDomain(set, get, "planning", content),
           true
         );
       } else {
-        runReply(set, get, text, {}, () => completeDomain(set, get, domain));
+        runReply(set, get, text, {}, (content) => completeDomain(set, get, domain, content));
       }
 
     } else if (d.mode === "schema") {
@@ -485,12 +511,13 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
         schemaAction: { type: "confirm_schema" },
       });
     }
+    set(s => ({ messageCount: s.messageCount + 1 }));
 
     runReply(
       set, get,
       "The user confirmed the database schema. Acknowledge it (one sentence) and generate the Database Design documentation section.",
       {},
-      () => completeDomain(set, get, "database"),
+      (content) => completeDomain(set, get, "database", content),
       true
     );
   },
@@ -515,6 +542,7 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
         },
       });
     }
+    set(s => ({ messageCount: s.messageCount + 1 }));
 
     runReply(
       set, get,
@@ -533,9 +561,15 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
   regenerateDomain: (domainId) => {
     const state = get();
     if (!state.lockedContext) return;
-    const content = generateDoc(domainId, state.lockedContext, state.lockedChoices, state.elaboration);
-    set(s => ({ domainContent: { ...s.domainContent, [domainId]: content } }));
-    persistToSupabase({ domainContent: get().domainContent });
+    runReply(
+      set,
+      get,
+      `Regenerate the ${DOMAINS.find(d => d.id === domainId)!.label} documentation section using the current project decisions. Output only the replacement markdown section.`,
+      {},
+      (content) => get().setDomainContent(domainId, content),
+      true,
+      domainId,
+    );
   },
 
   cancelStream: () => {
@@ -554,8 +588,12 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
       lockedChoices:    data.lockedChoices,
       completedDomains: data.completedDomains,
       domainContent:    data.domainContent,
-      messages:         data.conversationHistory,
+      messages:         data.conversationHistory
+        .filter(message => message.content.trim().length > 0)
+        .map(message => ({ ...message, showSchema: false })),
       elaboration:      data.elaboration,
+      schemaTables:     data.schemaTables ?? DEFAULT_SCHEMA,
+      schemaConfirmed:  data.schemaConfirmed ?? false,
       activeDomains:    active,
       currentDomain:    nextIdx === -1 ? active[active.length - 1].id : active[nextIdx].id,
       isComplete:       nextIdx === -1,
@@ -572,6 +610,7 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
 
   reset: () => {
     get().abortController?.abort();
+    void get().sessionLogger?.endSession(false);
     set({
       lockedContext: null, lockedChoices: {}, domainPhases: initialPhases(),
       currentDomain: DOMAINS[0].id, completedDomains: [], domainContent: {},
@@ -579,6 +618,7 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
       schemaConfirmed: false, helpIndex: 0, activeDomains: DOMAINS, projectName: "",
       isThinking: false, isStreaming: false, streamingText: "", isComplete: false,
       lastError: null, lastUserMessage: "", currentProvider: null, abortController: null,
+      projectId: null, sessionLogger: null, messageCount: 0, tokenGetter: null,
     });
   },
 }));

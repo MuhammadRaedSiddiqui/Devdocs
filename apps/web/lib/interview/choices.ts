@@ -7,6 +7,11 @@ export const CARD_CHOICES: Partial<Record<DomainId, ChoiceOption[]>> = {
     { id: "modular",       label: "Modular Monolith",  description: "Monolith with enforced module boundaries.", isRecommended: (c) => c.teamSize === "small" || c.teamSize === "medium" },
     { id: "microservices", label: "Microservices",     description: "Independent deployable services.", warningFor: (c) => c.teamSize === "solo" || c.experienceLevel === "beginner" ? "Adds 4–6 weeks of infrastructure work before your first feature ships" : null },
   ],
+  database: [
+    { id: "supabase", label: "Supabase", description: "Managed data, sign-in, and storage in one service.", isRecommended: (c) => c.teamSize === "solo" || c.experienceLevel === "beginner" },
+    { id: "managed_postgres", label: "Managed PostgreSQL", description: "A flexible, reliable database for most web applications.", isRecommended: (c) => c.experienceLevel !== "beginner" },
+    { id: "firebase", label: "Firebase", description: "Google-managed data with real-time updates built in.", isRecommended: (c) => c.projectType === "mobile" },
+  ],
   environment: [
     { id: "three_envs",   label: "Local + Staging + Prod",  description: "Standard three-environment setup.",          isRecommended: (c) => c.teamSize !== "solo" },
     { id: "two_envs",     label: "Local + Production",       description: "Minimal overhead — good for solo devs.",     isRecommended: (c) => c.teamSize === "solo" },

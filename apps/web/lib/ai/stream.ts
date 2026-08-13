@@ -1,17 +1,32 @@
 import type { AIProviderConfig } from '@/lib/ai/provider';
-import type { DomainId } from '@/lib/types';
+import type { DomainId, ProjectContext } from '@/lib/types';
 
 export type StreamErrorType = 'auth' | 'rate_limit' | 'timeout' | 'network' | 'unknown';
 export interface StreamCallbacks { onToken: (text: string) => void; onDone: (text: string) => void; onError: (type: StreamErrorType, message: string) => void; }
+export interface InterviewSnapshot {
+  lockedContext: ProjectContext;
+  lockedChoices: Partial<Record<DomainId, Record<string, string>>>;
+  elaboration: string;
+}
 
 export async function streamAIResponse(
-  _systemPrompt: string, userMessage: string, config: AIProviderConfig & { domainId: DomainId }, callbacks: StreamCallbacks, signal?: AbortSignal,
+  userMessage: string,
+  config: AIProviderConfig & { domainId: DomainId },
+  interview: InterviewSnapshot,
+  callbacks: StreamCallbacks,
+  signal?: AbortSignal,
 ): Promise<void> {
   try {
     const token = await config.getToken();
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}/ai/stream`, {
       method: 'POST', signal, headers: { 'content-type': 'application/json', authorization: token ? `Bearer ${token}` : '' },
-      body: JSON.stringify({ projectId: config.projectId, domainId: config.domainId, userMessage, provider: config.provider }),
+      body: JSON.stringify({
+        projectId: config.projectId,
+        domainId: config.domainId,
+        userMessage,
+        provider: config.provider,
+        interview,
+      }),
     });
     if (!response.ok || !response.body) {
       const payload = await response.json().catch(() => null) as { message?: string } | null;

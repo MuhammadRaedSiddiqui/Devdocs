@@ -183,11 +183,12 @@ export class SessionLogger {
   /**
    * End the current session
    */
-  async endSession(isComplete: boolean): Promise<void> {
+  async endSession(isComplete: boolean, updates: UpdateSessionRequest = {}): Promise<void> {
     if (!this.sessionId) return;
 
     try {
       await this.updateSession({
+        ...updates,
         isComplete,
         endedAt: new Date().toISOString(),
       });
