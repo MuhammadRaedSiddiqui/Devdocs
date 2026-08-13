@@ -2,118 +2,90 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Stitch Design Tokens (from DESIGN_EXPORT.md) */
 :root {
-  /* Core Brand */
-  --ink-black: #141413;
-  --onyx: #1f1e1d;
-  --graphite: #3d3d3a;
-  --dusty-gray: #73726c;
-  --stone: #9c9a92;
-  --parchment: #dedcd1;
-  --vellum-white: #faf9f5;
-  --snow-white: #ffffff;
-  --pale-azure: #ccdbe8;
-  --terra-cotta: #d97757;
-  --terra-light: #f5e8e2;
+  --color-sidebar-mist: #f9f9f9;
+  --color-pure-white: #ffffff;
+  --color-graphite-ink: #0d0d0d;
+  --color-mid-ash: #5d5d5d;
+  --color-hollow: #8f8f8f;
+  --color-hairline: #0000001a;
+  --color-hover-veil: #0000000d;
+  --color-ink-press: #000000;
+  --color-deep-charcoal: #00000080;
+  --color-edge-gray: #e6e6e6;
 
-  /* Surface System */
-  --surface: #fdf8f7;
-  --surface-dim: #ddd9d8;
-  --surface-bright: #fdf8f7;
-  --surface-container-lowest: #ffffff;
-  --surface-container-low: #f7f3f2;
-  --surface-container: #f1edec;
-  --surface-container-high: #ebe7e6;
-  --surface-container-highest: #e5e2e1;
+  --font-apple-system-body: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --text-caption: 14px;
+  --leading-caption: 1.43;
+  --text-body: 16px;
+  --leading-body: 1.5;
+  --text-heading: 24px;
+  --leading-heading: 1.33;
+  --spacing-6: 6px;
+  --spacing-8: 8px;
+  --spacing-10: 10px;
+  --spacing-12: 12px;
+  --spacing-16: 16px;
+  --spacing-20: 20px;
+  --page-max-width: 1200px;
+  --section-gap: 24px;
+  --card-padding: 16px;
+  --element-gap: 6px;
+  --radius-lg: 10px;
+  --radius-2xl: 16px;
 
-  /* Semantic */
-  --primary: #000000;
-  --on-primary: #ffffff;
-  --secondary: #99462a;
-  --secondary-container: #fe9572;
-  --error: #ba1a1a;
-  --error-container: #ffdad6;
-  --outline: #767872;
-  --outline-variant: #c7c7c0;
-
-  /* Backward-compatible aliases */
-  --vellum-bg: var(--surface);
-  --vellum-surface: var(--vellum-white);
-  --vellum-border: var(--parchment);
-  --vellum-border-light: var(--surface-container-highest);
-  --ink: var(--ink-black);
-  --ink-secondary: var(--graphite);
-  --ink-muted: var(--dusty-gray);
-  --ink-faint: var(--stone);
-  --terracotta: var(--terra-cotta);
-  --danger: var(--error);
-  --danger-bg: var(--error-container);
-  --danger-border: var(--error-container);
-
-  /* Spacing */
-  --stitch-unit: 8px;
-  --stitch-gap-xs: 8px;
-  --stitch-gap-md: 24px;
-  --stitch-gap-lg: 32px;
-  --stitch-section-xl: 40px;
-  --stitch-container-max: 1200px;
-
-  /* Border Radius */
-  --stitch-radius: 4px;
-  --stitch-radius-lg: 8px;
-  --stitch-radius-xl: 12px;
-  --stitch-radius-full: 9999px;
-  --stitch-radius-input: 9.6px;
-
-  /* Typography */
-  --font-stitch-lora: "Lora", serif;
-  --font-stitch-inter: "Inter", sans-serif;
-  --font-stitch-mono: "JetBrains Mono", monospace;
-  --font-mono: "JetBrains Mono", Menlo, monospace;
+  /* Compatibility aliases keep existing utility classes inside the new system. */
+  --vellum-bg: var(--color-sidebar-mist);
+  --vellum-surface: var(--color-pure-white);
+  --vellum-border: var(--color-hairline);
+  --vellum-border-light: var(--color-hairline);
+  --ink: var(--color-graphite-ink);
+  --ink-secondary: var(--color-mid-ash);
+  --ink-muted: var(--color-mid-ash);
+  --ink-faint: var(--color-hollow);
+  --terracotta: var(--color-graphite-ink);
+  /* Destructive tokens retain semantic red for a11y — monochrome elsewhere. */
+  --danger: #c0392b;
+  --danger-bg: #fdf2f2;
+  --danger-border: #f3c4c4;
 }
 
-/* Badge Utilities */
-.badge-blue { background: #e6f1fb; color: #0c447c; }
-.badge-green { background: #eaf3de; color: #27500a; }
-.badge-amber { background: #faeeda; color: #854f0b; }
-.badge-purple { background: #eeedfe; color: #534ab7; }
-.badge-orange { background: #fce8d6; color: #7a3410; }
-
-/* Base Styles */
-body { background-color: var(--vellum-bg); color: var(--ink); font-family: var(--font-stitch-inter); }
-
-/* Stitch Typography Classes */
-.font-stitch-serif { font-family: var(--font-stitch-lora); }
-.font-stitch-sans { font-family: var(--font-stitch-inter); }
-.font-stitch-mono { font-family: var(--font-stitch-mono); }
-
-.text-stitch-display { font-size: 56px; line-height: 1.2; font-weight: 330; font-family: var(--font-stitch-lora); }
-.text-stitch-h2 { font-size: 30px; line-height: 1.33; font-weight: 400; font-family: var(--font-stitch-lora); }
-.text-stitch-h3 { font-size: 24px; line-height: 1.33; font-weight: 400; font-family: var(--font-stitch-lora); }
-.text-stitch-h4 { font-size: 18px; line-height: 1.33; font-weight: 400; font-family: var(--font-stitch-lora); }
-.text-stitch-body-lg { font-size: 16px; line-height: 1.5; font-weight: 400; font-family: var(--font-stitch-inter); }
-.text-stitch-body-md { font-size: 15px; line-height: 1.4; font-weight: 400; font-family: var(--font-stitch-inter); }
-.text-stitch-body-sm { font-size: 14px; line-height: 1.4; font-weight: 400; font-family: var(--font-stitch-inter); }
-.text-stitch-caption { font-size: 12px; line-height: 1.33; font-weight: 400; font-family: var(--font-stitch-inter); }
-.text-stitch-label-caps { font-size: 11px; line-height: 1.33; font-weight: 500; font-family: var(--font-stitch-inter); letter-spacing: 0.05em; text-transform: uppercase; }
-
-/* Backward-compatible alias */
-.font-serif-heading { font-family: var(--font-stitch-lora); font-weight: 400; }
-
-/* Stitch Animations */
-@keyframes stitch-fadeIn {
-  from { opacity: 0.7; }
-  to { opacity: 1; }
+* { border-color: var(--color-hairline); }
+html, body { min-height: 100%; }
+body {
+  background: var(--color-pure-white);
+  color: var(--color-graphite-ink);
+  font-family: var(--font-apple-system-body);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
 }
-@keyframes stitch-blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+button, input, textarea, select { font: inherit; }
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--color-graphite-ink);
+  outline-offset: 2px;
 }
-@keyframes toast-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+
+.font-serif-heading, .font-stitch-serif, .font-stitch-sans { font-family: var(--font-apple-system-body); }
+.font-serif-heading { font-weight: 600; }
+.font-stitch-mono { font-family: var(--font-mono); }
+.text-stitch-display, .text-stitch-h2, .text-stitch-h3, .text-stitch-h4 {
+  font-family: var(--font-apple-system-body);
+  font-size: var(--text-heading);
+  line-height: var(--leading-heading);
+  font-weight: 600;
 }
-.animate-stitch-fadeIn { animation: stitch-fadeIn 100ms ease-out; }
-.animate-stitch-blink { animation: stitch-blink 500ms ease-in-out infinite; }
+.text-stitch-body-lg { font-size: var(--text-body); line-height: var(--leading-body); }
+.text-stitch-body-md, .text-stitch-body-sm { font-size: var(--text-caption); line-height: var(--leading-caption); }
+.text-stitch-caption, .text-stitch-label-caps { font-size: 12px; line-height: var(--leading-caption); }
+
+.badge-blue, .badge-green, .badge-amber, .badge-purple, .badge-orange {
+  background: var(--color-sidebar-mist);
+  color: var(--color-graphite-ink);
+  border-radius: 0;
+}
+
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 .animate-toast-in { animation: toast-in 0.2s ease-out; }
+
+[class*="shadow"] { box-shadow: none !important; }

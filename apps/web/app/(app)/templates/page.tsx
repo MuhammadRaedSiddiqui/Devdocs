@@ -52,11 +52,11 @@ export default function TemplatesPage() {
       <Navbar active="templates" />
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <aside className="w-[220px] flex-shrink-0 border-r border-vellum-border bg-vellum flex flex-col py-5 overflow-y-auto hidden md:flex">
+        <aside className="w-[260px] flex-shrink-0 border-r border-hairline bg-sidebar-mist flex flex-col py-4 overflow-y-auto hidden md:flex">
           <div className="px-4 mb-5">
             <Link
               href="/dashboard"
-              className="w-full py-2.5 px-3.5 bg-white border border-vellum-border rounded-vellum text-[13px] font-medium flex items-center gap-2 text-ink-secondary hover:border-ink transition-colors"
+              className="w-full py-2 px-2.5 bg-white border border-hairline rounded-lg text-[14px] font-medium flex items-center gap-2 text-ink-secondary hover:bg-hover-veil transition-colors"
             >
               ← Back to projects
             </Link>
@@ -78,9 +78,9 @@ export default function TemplatesPage() {
 
           <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
             {TEMPLATES.map(t => (
-              <div key={t.id} className="border border-vellum-border rounded-vellum bg-white p-5 flex flex-col">
+              <div key={t.id} className="border border-hairline rounded-lg bg-white p-4 flex flex-col">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className={cn("text-[10px] px-1.5 py-0.5 rounded-md font-medium", PROJECT_TYPE_BADGE_CLASS[t.projectType])}>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-none font-medium bg-sidebar-mist text-ink">
                     {PROJECT_TYPE_LABELS[t.projectType]}
                   </span>
                 </div>
@@ -89,7 +89,7 @@ export default function TemplatesPage() {
                 <button
                   type="button"
                   onClick={() => handleUse(t)}
-                  className="w-full py-2 px-3 bg-ink text-vellum rounded-vellum text-[12px] font-medium hover:bg-ink-secondary transition-colors"
+                  className="w-full py-2 px-3 bg-ink text-white rounded-lg text-[14px] font-medium hover:bg-ink-press transition-colors"
                 >
                   Use this template →
                 </button>
@@ -105,7 +105,7 @@ export default function TemplatesPage() {
           className="fixed inset-0 bg-ink/40 flex items-center justify-center z-50"
           onClick={e => { if (e.target === e.currentTarget) setSelected(null); }}
         >
-          <div className="bg-vellum rounded-xl w-[420px] overflow-hidden shadow-2xl">
+          <div className="bg-white border border-hairline rounded-lg w-[420px] overflow-hidden">
             <div className="px-6 pt-5 pb-4 border-b border-vellum-border">
               <h3 className="font-serif-heading text-lg text-ink">Name your project</h3>
               <p className="text-[13px] text-ink-muted mt-1">

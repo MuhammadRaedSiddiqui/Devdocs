@@ -35,3 +35,9 @@ Thumbs.db
 
 # Logs
 *.log
+
+# DevDocs AI — local artifacts
+.freebuff/
+session_*.md
+.agents/
+.pnpm-store/

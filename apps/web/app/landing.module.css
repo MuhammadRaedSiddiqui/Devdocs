@@ -530,3 +530,29 @@
 .footerLinks { display: flex; gap: 24px; list-style: none; }
 .footerLinks a { font-size: 13px; color: #73726c; text-decoration: none; transition: color 150ms ease; }
 .footerLinks a:hover { color: #141413; }
+
+/* Graphite-on-paper system override. The landing page deliberately shares the
+   same restrained UI language as the application instead of a marketing skin. */
+.root {
+  font-family: var(--font-apple-system-body);
+  background: var(--color-pure-white);
+  color: var(--color-graphite-ink);
+  font-size: 16px;
+  line-height: 1.5;
+}
+.root * { box-shadow: none !important; }
+.nav, .footer, .baCard, .outputHead, .pricingCard, .faqQuestion:hover {
+  background: var(--color-sidebar-mist) !important;
+  border-color: var(--color-hairline) !important;
+}
+.nav { backdrop-filter: none; height: 52px; padding: 0 20px; }
+.navLogo, .displayType, .heading, .byokColH4, .footerWordmark,
+.root h1, .root h2, .root h3, .root h4 { font-family: var(--font-apple-system-body) !important; color: var(--color-graphite-ink) !important; }
+.displayType, .heading, .sectionCta .displayType { font-size: 24px !important; font-weight: 600 !important; line-height: 1.33 !important; }
+.heroSub, .problemIntro p, .stepCell p, .outputDesc, .byokCol p, .ctaSub,
+.footerLinks a, .footerCopy, .heroNote, .sectionLabel { color: var(--color-mid-ash) !important; }
+.divider, .root hr, .root [class*="Card"], .root [class*="Table"], .root [class*="Col"] { border-color: var(--color-hairline) !important; }
+.btnGhost, .btnGhostLg { border-color: var(--color-hairline); color: var(--color-graphite-ink); border-radius: 10px; }
+.btnPrimary, .btnPrimaryLg { background: var(--color-graphite-ink); color: var(--color-pure-white); border-radius: 10px; }
+.sectionCta, .terminal { background: var(--color-pure-white) !important; color: var(--color-graphite-ink) !important; }
+.sectionCta * { color: var(--color-graphite-ink) !important; }

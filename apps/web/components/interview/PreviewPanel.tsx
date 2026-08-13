@@ -68,26 +68,26 @@ export function PreviewPanel() {
   }
 
   return (
-    <div className="flex-shrink-0 border-l border-vellum-border bg-vellum flex flex-col overflow-hidden transition-[width,opacity] duration-300 max-md:!w-full max-md:!opacity-100 max-md:!border-l-0" style={{ width: store.isComplete ? 320 : 0, opacity: store.isComplete ? 1 : 0 }}>
+    <div className="flex-shrink-0 border-l border-hairline bg-sidebar-mist flex flex-col overflow-hidden transition-[width,opacity] duration-300 max-md:!w-full max-md:!opacity-100 max-md:!border-l-0" style={{ width: store.isComplete ? 320 : 0, opacity: store.isComplete ? 1 : 0 }}>
       {store.isComplete && (
         <>
-          <div className="px-4 py-3 border-b border-vellum-border flex items-center gap-2 flex-shrink-0">
+          <div className="px-4 py-3 border-b border-hairline flex items-center gap-2 flex-shrink-0">
             <span className="font-serif-heading text-[13px] text-ink flex-1">DOCUMENTATION.md</span>
             <button
               type="button"
               onClick={() => setMode(mode === "preview" ? "edit" : "preview")}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-medium border ${mode === "edit" ? "bg-ink text-vellum border-ink" : "bg-white text-ink-secondary border-vellum-border hover:border-ink/30"}`}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border ${mode === "edit" ? "bg-ink text-white border-ink" : "bg-white text-ink-secondary border-hairline hover:bg-hover-veil"}`}
             >
               {mode === "edit" ? "Preview" : "Edit"}
             </button>
-            <button type="button" onClick={handleDownloadMd} className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-ink text-vellum text-[11px] font-medium">
+            <button type="button" onClick={handleDownloadMd} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-ink text-white text-[11px] font-medium">
               ↓ .md
             </button>
             <button
               type="button"
               onClick={handleDownloadZip}
               disabled={zipping}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-ink text-vellum text-[11px] font-medium disabled:opacity-50"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-ink text-white text-[11px] font-medium disabled:opacity-50"
             >
               {zipping ? <span className="inline-block w-3 h-3 border-2 border-vellum border-t-transparent rounded-full animate-spin" /> : "↓ .zip"}
             </button>
@@ -97,7 +97,7 @@ export function PreviewPanel() {
             <textarea
               value={editText}
               onChange={e => handleEditChange(e.target.value)}
-              className="flex-1 w-full p-3.5 bg-vellum border-none text-ink font-mono text-xs leading-relaxed resize-none focus:outline-none"
+              className="flex-1 w-full p-3.5 bg-white border-none text-ink font-mono text-xs leading-relaxed resize-none"
               spellCheck={false}
             />
           ) : (

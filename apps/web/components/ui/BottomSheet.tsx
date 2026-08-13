@@ -22,12 +22,12 @@ export function BottomSheet({ open, onClose, title, children }: Props) {
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 bg-ink/30 z-40 transition-opacity duration-200 ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+        className={`fixed inset-0 bg-deep-charcoal z-40 transition-opacity duration-200 ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}
         onClick={onClose}
       />
       {/* Sheet */}
       <div
-        className={`fixed bottom-0 left-0 right-0 bg-vellum border-t border-vellum-border rounded-t-2xl z-40 max-h-[75vh] overflow-y-auto transition-transform duration-200 ease-out ${open ? "translate-y-0" : "translate-y-full"}`}
+        className={`fixed bottom-0 left-0 right-0 bg-white border-t border-hairline rounded-t-lg z-40 max-h-[75vh] overflow-y-auto transition-transform duration-200 ease-out ${open ? "translate-y-0" : "translate-y-full"}`}
       >
         {/* Drag handle */}
         <div className="flex justify-center pt-3 pb-2">

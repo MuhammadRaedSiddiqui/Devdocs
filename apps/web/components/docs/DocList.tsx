@@ -19,7 +19,7 @@ export function DocList({docs,search,sort,selectedId,onSearch,onSort,onSelect}:L
           <span className="text-[11px] text-ink-faint">{list.length} document{list.length!==1?"s":""}</span>
           <div className="flex gap-1">
             {(["recent","project","domain"] as const).map(s=>(
-              <button key={s} type="button" onClick={()=>onSort(s)} className={cn("px-2 py-1 text-[11px] rounded-md border capitalize",sort===s?"bg-ink text-white border-ink":"bg-white text-ink-muted border-vellum-border")}>{s}</button>
+              <button key={s} type="button" onClick={()=>onSort(s)} className={cn("px-2 py-1 text-[11px] rounded-lg border capitalize",sort===s?"bg-ink text-white border-ink":"bg-white text-ink-muted border-hairline hover:bg-hover-veil")}>{s}</button>
             ))}
           </div>
         </div>
@@ -28,13 +28,13 @@ export function DocList({docs,search,sort,selectedId,onSearch,onSort,onSelect}:L
         {list.length===0?(
           <div className="p-10 text-center text-ink-faint text-xs">No documents match your search or filter.</div>
         ):list.map(d=>(
-          <button key={d.id} type="button" onClick={()=>onSelect(d.id)} className={cn("w-full text-left px-4 py-3 border-b border-vellum-border-light border-l-2 transition-colors",selectedId===d.id?"bg-[#fff2ec] border-l-terracotta":"border-l-transparent hover:bg-vellum")}>
+          <button key={d.id} type="button" onClick={()=>onSelect(d.id)} className={cn("w-full text-left px-4 py-3 border-b border-hairline border-l-2 transition-colors",selectedId===d.id?"bg-hover-veil border-l-ink":"border-l-transparent hover:bg-sidebar-mist")}>
             <div className="flex items-baseline justify-between mb-1">
               <span className="font-mono text-[12.5px] font-medium text-ink">{d.file}</span>
               <span className="text-[10.5px] text-ink-faint whitespace-nowrap ml-2 flex-shrink-0">{d.date}</span>
             </div>
             <div className="flex items-center gap-1.5 mb-1">
-              <span className={cn("text-[10px] px-1.5 py-0.5 rounded-md font-medium",d.projectBadgeClass)}>{d.project}</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-none font-medium bg-sidebar-mist text-ink">{d.project}</span>
               <span className="text-[11px] text-ink-faint">{d.domainLabel}</span>
             </div>
             <div className="text-[11.5px] text-ink-muted truncate">{d.snippet}</div>

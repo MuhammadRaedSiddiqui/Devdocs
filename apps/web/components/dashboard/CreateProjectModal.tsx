@@ -72,7 +72,7 @@ export function CreateProjectModal({ open, onClose, onCreate, creating }: Props)
   if (creating) {
     return (
       <div className="fixed inset-0 bg-ink/40 flex items-center justify-center z-50">
-        <div className="bg-vellum rounded-xl w-[480px] overflow-hidden shadow-2xl">
+        <div className="bg-white border border-hairline rounded-lg w-[480px] overflow-hidden">
           <div className="px-6 py-16 flex flex-col items-center gap-4">
             <div className="w-8 h-8 border-2 border-ink/20 border-t-ink rounded-full animate-spin" />
             <div className="text-center">
@@ -133,7 +133,7 @@ export function CreateProjectModal({ open, onClose, onCreate, creating }: Props)
         className="fixed inset-0 bg-ink/40 flex items-center justify-center z-50"
         onClick={e => { if (e.target === e.currentTarget) onClose(); }}
       >
-        <div className="bg-vellum rounded-xl w-[480px] overflow-hidden shadow-2xl">
+        <div className="bg-white border border-hairline rounded-lg w-[480px] overflow-hidden">
           <div className="px-6 pt-5 pb-4 border-b border-vellum-border">
             <h3 className="font-serif-heading text-lg text-ink">Connect your AI provider</h3>
             <p className="text-[13px] text-ink-muted mt-1">
@@ -178,9 +178,9 @@ export function CreateProjectModal({ open, onClose, onCreate, creating }: Props)
             </div>
 
             {provider === "bedrock" ? (
-              <div className="flex gap-2.5 p-3 rounded-lg border-l-[3px]" style={{ borderLeftColor: "#0F6E56", background: "#F0FDFA" }}>
+              <div className="flex gap-2.5 p-3 rounded-lg border border-hairline bg-sidebar-mist">
                 <span className="text-sm flex-shrink-0 mt-0.5">☁️</span>
-                <div className="text-[11px] leading-snug" style={{ color: "#0a4a3d" }}>
+                <div className="text-[11px] leading-snug text-ink-secondary">
                   <span className="font-medium">Amazon Bedrock is configured on this server.</span><br />
                   Region: {bedrockStatus?.region ?? "us-east-1"} · No API key needed — uses server credentials.
                 </div>
@@ -201,7 +201,7 @@ export function CreateProjectModal({ open, onClose, onCreate, creating }: Props)
                     className="w-full px-3 py-2.5 border border-ink/15 rounded-vellum text-[13px] bg-white text-ink font-mono focus:outline-none focus:border-ink/30"
                   />
                   {verifyError && (
-                    <div className="text-[11px] mt-1.5" style={{ color: "#c0392b" }}>{verifyError}</div>
+                    <div className="text-[11px] mt-1.5 text-ink-muted">{verifyError}</div>
                   )}
                   <div className="text-[11px] text-ink-faint mt-1.5">
                     {provider === "anthropic" ? (
@@ -221,9 +221,9 @@ export function CreateProjectModal({ open, onClose, onCreate, creating }: Props)
                 </div>
 
                 {/* BYOK notice */}
-                <div className="flex gap-2.5 p-3 rounded-lg border-l-[3px] mt-4" style={{ borderLeftColor: "#0F6E56", background: "#F0FDFA" }}>
+                <div className="flex gap-2.5 p-3 rounded-lg border border-hairline bg-sidebar-mist mt-4">
                   <span className="text-sm flex-shrink-0 mt-0.5">🔒</span>
-                  <div className="text-[11px] leading-snug" style={{ color: "#0a4a3d" }}>
+                  <div className="text-[11px] leading-snug text-ink-secondary">
                     Your key is sent once over HTTPS, verified, and encrypted at rest (AES-256-GCM). It&apos;s never stored in the browser.
                   </div>
                 </div>
@@ -270,7 +270,7 @@ export function CreateProjectModal({ open, onClose, onCreate, creating }: Props)
       className="fixed inset-0 bg-ink/40 flex items-center justify-center z-50"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-vellum rounded-xl w-[480px] overflow-hidden shadow-2xl">
+        <div className="bg-white border border-hairline rounded-lg w-[480px] overflow-hidden">
         <div className="px-6 pt-5 pb-4 border-b border-vellum-border">
           <h3 className="font-serif-heading text-lg text-ink">New project</h3>
           <p className="text-[13px] text-ink-muted mt-1">Name your project and pick a type — then the AI takes over.</p>

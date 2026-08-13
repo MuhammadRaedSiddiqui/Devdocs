@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DiscoveryForm } from "@/components/interview/DiscoveryForm";
 import { DomainProgress } from "@/components/interview/DomainProgress";
 import { ChatPanel } from "@/components/interview/ChatPanel";
@@ -12,7 +12,7 @@ import { getActiveConfig } from "@/lib/ai/provider";
 import { setAISession } from "@/lib/ai/provider";
 import type { AIProvider } from "@/lib/ai/provider";
 import { trpc } from "@/lib/trpc";
-import type { ChatMessage, DomainId, ProjectContext, ProjectType } from "@/lib/types";
+import type { ChatMessage, DomainId, ProjectContext, ProjectType, SchemaTables } from "@/lib/types";
 import { useAuth } from "@clerk/nextjs";
 
 const PROVIDER_LABELS: Record<AIProvider, string> = {
@@ -29,6 +29,8 @@ type SavedInterviewData = {
   domainContent?: Partial<Record<DomainId, string>>;
   conversationHistory?: ChatMessage[];
   elaboration?: string;
+  schemaTables?: SchemaTables;
+  schemaConfirmed?: boolean;
 };
 
 function readSavedInterviewData(value: unknown): SavedInterviewData | null {
@@ -45,6 +47,30 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
   const [previewSheet, setPreviewSheet] = useState(false);
   const projectQuery = trpc.projects.get.useQuery({ id: params.id });
   const saveInterview = trpc.projects.update.useMutation();
+  const queuedSave = useRef<Parameters<typeof saveInterview.mutateAsync>[0] | null>(null);
+  const saveInFlight = useRef(false);
+
+  const flushQueuedSave = useCallback(async () => {
+    if (saveInFlight.current || !queuedSave.current) return;
+
+    const nextSave = queuedSave.current;
+    queuedSave.current = null;
+    saveInFlight.current = true;
+    let succeeded = false;
+    try {
+      await saveInterview.mutateAsync(nextSave);
+      succeeded = true;
+    } catch {
+      // Preserve the latest snapshot so a subsequent state change can retry it.
+      if (!queuedSave.current) queuedSave.current = nextSave;
+    } finally {
+      saveInFlight.current = false;
+    }
+
+    if (succeeded && queuedSave.current) {
+      void flushQueuedSave();
+    }
+  }, [saveInterview.mutateAsync]);
 
   const pct = Math.round(store.completedDomains.length / store.activeDomains.length * 100);
 
@@ -77,7 +103,12 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
           domainContent: saved.domainContent ?? {},
           conversationHistory: saved.conversationHistory ?? [],
           elaboration: saved.elaboration ?? "",
+          schemaTables: saved.schemaTables,
+          schemaConfirmed: saved.schemaConfirmed,
         });
+        if (!useInterviewStore.getState().isComplete) {
+          void useInterviewStore.getState().initializeSession(getToken);
+        }
       } else {
         store.resumeFromSaved({
           lockedContext: saved.lockedContext,
@@ -86,13 +117,10 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
           domainContent: {},
           conversationHistory: [],
           elaboration: saved.elaboration ?? "",
+          schemaTables: saved.schemaTables,
+          schemaConfirmed: saved.schemaConfirmed,
         });
         store.setLockedContext(saved.lockedContext);
-      }
-
-      // Initialize session logging after everything is set up
-      if (!store.isComplete) {
-        store.initializeSession(getToken);
       }
     }
 
@@ -100,16 +128,11 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
     setHydrated(true);
   }, [projectQuery.data, params.id, getToken, store]);
 
-  const hasSavedContext = useRef(false);
   useEffect(() => {
-    if (!hydrated || !store.lockedContext || saveInterview.isPending) return;
-
-    const isFirstContextSave = !hasSavedContext.current && !!store.lockedContext;
-    const delay = isFirstContextSave ? 0 : 750;
+    if (!hydrated || !store.lockedContext) return;
 
     const timeout = window.setTimeout(() => {
-      if (isFirstContextSave) hasSavedContext.current = true;
-      saveInterview.mutate({
+      queuedSave.current = {
         id: params.id,
         data: {
           interviewData: {
@@ -123,8 +146,9 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
             schemaConfirmed: store.schemaConfirmed,
           },
         },
-      });
-    }, delay);
+      };
+      void flushQueuedSave();
+    }, 500);
 
     return () => window.clearTimeout(timeout);
   }, [
@@ -138,6 +162,7 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
     store.elaboration,
     store.schemaTables,
     store.schemaConfirmed,
+    flushQueuedSave,
   ]);
 
   if (projectQuery.isLoading || !hydrated) {
@@ -152,8 +177,8 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      <header className="h-[52px] border-b border-vellum-border bg-vellum flex items-center px-4 md:px-7 gap-2.5 flex-shrink-0">
-        <span className="font-serif-heading text-[17px] text-ink">DevDocs AI</span>
+      <header className="h-[52px] border-b border-hairline bg-sidebar-mist flex items-center px-4 md:px-7 gap-2.5 flex-shrink-0">
+        <span className="font-medium text-[14px] text-ink">DevDocs</span>
         <span className="text-[13px] text-ink-muted hidden sm:inline">{projectQuery.data.name}</span>
         <div className="ml-auto flex items-center gap-2">
           {store.currentProvider && (
@@ -161,7 +186,7 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
               {PROVIDER_LABELS[store.currentProvider] ?? store.currentProvider}
             </span>
           )}
-          <span className="text-[11px] px-3 py-1 rounded-full font-medium bg-[#ccdbe8] text-[#0c447c]">
+            <span className="text-[11px] px-3 py-1 rounded-none font-medium bg-sidebar-mist border border-hairline text-ink">
             {pct}%
           </span>
         </div>

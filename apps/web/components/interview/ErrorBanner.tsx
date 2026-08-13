@@ -18,7 +18,7 @@ export function ErrorBanner() {
   return (
     <div
       className="mx-5 mt-2 flex items-start gap-3 rounded-vellum border border-vellum-border border-l-[3px] bg-white px-4 py-3"
-      style={{ borderLeftColor: "var(--terracotta, #d97757)" }}
+      style={{ borderLeftColor: "var(--color-graphite-ink)" }}
     >
       <div className="flex-1 text-[13px] leading-relaxed text-ink-secondary">
         {lastError.message}
@@ -27,7 +27,7 @@ export function ErrorBanner() {
         {lastError.type === "auth" && (
           <Link
             href="/settings?section=apikey"
-            className="px-3 py-1.5 text-[12px] font-medium text-terracotta border border-terracotta/30 rounded-vellum hover:bg-[#fff8f5]"
+            className="px-3 py-1.5 text-[12px] font-medium text-ink border border-hairline rounded-lg hover:bg-hover-veil"
           >
             Check API key
           </Link>

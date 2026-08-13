@@ -16,7 +16,7 @@ export function SchemaTable({ tables, interactive, onAddField, onHelp, onConfirm
     <div className="mt-2.5 bg-vellum border border-vellum-border rounded-lg overflow-hidden">
       {Object.entries(tables).map(([name,fields])=>(
         <div key={name}>
-          <div className="px-3 py-1.5 bg-[#f3f1eb] border-b border-vellum-border text-[11px] font-medium text-ink-muted uppercase tracking-wide">{name}</div>
+          <div className="px-3 py-1.5 bg-sidebar-mist border-b border-hairline text-[11px] font-medium text-ink-muted uppercase tracking-wide">{name}</div>
           <table className="w-full border-collapse">
             <thead><tr>
               <th className="px-2.5 py-1.5 text-[11px] font-medium text-ink-muted text-left border-b border-vellum-border bg-vellum">Field</th>

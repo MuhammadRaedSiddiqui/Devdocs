@@ -40,10 +40,10 @@ devdocs-ai/
 ├── turbo.json
 ├── pnpm-workspace.yaml
 ├── CLAUDE.md                   ← you are here
-├── IMPLEMENTATION_STRATEGY.md  6-phase implementation plan (Phases 2-4 complete)
-├── PROMPT_01_AI_PROVIDERS.md   Anthropic + OpenAI dual-provider prompt (executed)
-├── PROMPT_02_BEDROCK.md        Amazon Bedrock third-provider prompt
-└── CLAUDE_CODE_PROMPTS.md      14 feature improvement prompts
+├── docs/IMPLEMENTATION_STRATEGY.md  6-phase implementation plan (Phases 2-4 complete)
+├── docs/PROMPT_01_AI_PROVIDERS.md   Anthropic + OpenAI dual-provider prompt (executed)
+├── docs/PROMPT_02_BEDROCK.md        Amazon Bedrock third-provider prompt
+└── docs/CLAUDE_CODE_PROMPTS.md      14 feature improvement prompts
 ```
 
 ---
@@ -443,18 +443,18 @@ corresponding prompt file before starting work on any of them.
 
 | Feature | Prompt file | Status |
 |---|---|---|
-| Clerk auth + tRPC + server streaming | `IMPLEMENTATION_STRATEGY.md` Phases 1-4 | ✅ **Complete** |
-| Amazon Bedrock provider | `PROMPT_02_BEDROCK.md` | ✅ **Complete** |
-| Error states + timeout handling | `CLAUDE_CODE_PROMPTS.md` Prompt 4 | ✅ **Complete** |
-| Domain skipping by project type | `CLAUDE_CODE_PROMPTS.md` Prompt 5 | ✅ **Complete** |
-| Inline document editing | `CLAUDE_CODE_PROMPTS.md` Prompt 6 | ✅ **Complete** |
-| ZIP export | `CLAUDE_CODE_PROMPTS.md` Prompt 7 | ✅ **Complete** |
-| Cmd+K search | `CLAUDE_CODE_PROMPTS.md` Prompt 9 | ✅ **Complete** |
-| react-markdown + XSS safety | `CLAUDE_CODE_PROMPTS.md` Prompt 10 | ✅ **Complete** |
-| Global toast provider | `CLAUDE_CODE_PROMPTS.md` Prompt 11 | ✅ **Complete** |
-| Mobile responsive layout | `CLAUDE_CODE_PROMPTS.md` Prompt 12 | ✅ **Complete** |
-| Templates page | `CLAUDE_CODE_PROMPTS.md` Prompt 13 | ✅ **Complete** |
-| Loading skeletons | `CLAUDE_CODE_PROMPTS.md` Prompt 14 | ✅ **Complete** |
+| Clerk auth + tRPC + server streaming | `docs/IMPLEMENTATION_STRATEGY.md` Phases 1-4 | ✅ **Complete** |
+| Amazon Bedrock provider | `docs/PROMPT_02_BEDROCK.md` | ✅ **Complete** |
+| Error states + timeout handling | `docs/CLAUDE_CODE_PROMPTS.md` Prompt 4 | ✅ **Complete** |
+| Domain skipping by project type | `docs/CLAUDE_CODE_PROMPTS.md` Prompt 5 | ✅ **Complete** |
+| Inline document editing | `docs/CLAUDE_CODE_PROMPTS.md` Prompt 6 | ✅ **Complete** |
+| ZIP export | `docs/CLAUDE_CODE_PROMPTS.md` Prompt 7 | ✅ **Complete** |
+| Cmd+K search | `docs/CLAUDE_CODE_PROMPTS.md` Prompt 9 | ✅ **Complete** |
+| react-markdown + XSS safety | `docs/CLAUDE_CODE_PROMPTS.md` Prompt 10 | ✅ **Complete** |
+| Global toast provider | `docs/CLAUDE_CODE_PROMPTS.md` Prompt 11 | ✅ **Complete** |
+| Mobile responsive layout | `docs/CLAUDE_CODE_PROMPTS.md` Prompt 12 | ✅ **Complete** |
+| Templates page | `docs/CLAUDE_CODE_PROMPTS.md` Prompt 13 | ✅ **Complete** |
+| Loading skeletons | `docs/CLAUDE_CODE_PROMPTS.md` Prompt 14 | ✅ **Complete** |
 
 ---
 

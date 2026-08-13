@@ -9,9 +9,9 @@ export function PageHeader({title,sub}:{title:string;sub:string}) {
 export function Card({title,sub,children,danger}:{title:string;sub?:string;children:React.ReactNode;danger?:boolean}) {
   return (
     <div className={cn("bg-white border rounded-vellum mb-4 overflow-hidden",danger?"border-danger-border":"border-vellum-border")}>
-      <div className={cn("px-5 pt-4 pb-3.5 border-b",danger?"border-danger-border":"border-vellum-border-light")} style={danger?{background:"#fdf2f2"}:{}}>
-        <div className={cn("font-serif-heading text-[15px] mb-0.5",danger?"text-[#7a2418]":"text-ink")}>{title}</div>
-        {sub&&<div className={cn("text-xs leading-snug",danger?"text-[#a8584b]":"text-ink-muted")}>{sub}</div>}
+      <div className="px-5 pt-4 pb-3.5 border-b border-hairline bg-sidebar-mist">
+        <div className="font-serif-heading text-[15px] mb-0.5 text-ink">{title}</div>
+        {sub&&<div className="text-xs leading-snug text-ink-muted">{sub}</div>}
       </div>
       <div className="px-5 py-[18px]">{children}</div>
     </div>
@@ -30,7 +30,7 @@ export function AccountSection() {
       <PageHeader title="Account" sub="Manage your profile and security."/>
       <Card title="Profile" sub="This information is visible only to you.">
         <div className="flex items-center gap-3.5 mb-[18px]">
-          <div className="w-14 h-14 rounded-full bg-ink text-vellum flex items-center justify-center font-serif-heading text-[22px] flex-shrink-0">{name.charAt(0)}</div>
+          <div className="w-14 h-14 rounded-full bg-ink text-white flex items-center justify-center font-serif-heading text-[22px] flex-shrink-0">{name.charAt(0)}</div>
           <div><div className="text-[15px] font-medium text-ink">{name}</div><div className="text-xs text-ink-faint mt-0.5">Member since April 2026</div></div>
         </div>
         <Field label="Display name"><input type="text" value={name} onChange={e=>setName(e.target.value)} className="w-full px-3 py-2.5 border border-ink/15 rounded-lg text-[13px] bg-white text-ink"/></Field>

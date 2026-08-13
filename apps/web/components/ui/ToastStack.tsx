@@ -11,10 +11,7 @@ export function ToastStack() {
       {toasts.map(t => (
         <div
           key={t.id}
-          className={`flex items-center gap-3 bg-ink text-vellum text-xs px-4 py-2 rounded-lg animate-toast-in ${
-            t.type === "success" ? "border-l-[3px] border-l-[#1D9E75]" :
-            t.type === "error" ? "border-l-[3px] border-l-terracotta" : ""
-          }`}
+          className="flex items-center gap-3 bg-ink-press text-white text-xs px-4 py-2 rounded-lg animate-toast-in"
         >
           <span className="flex-1">{t.message}</span>
           <button

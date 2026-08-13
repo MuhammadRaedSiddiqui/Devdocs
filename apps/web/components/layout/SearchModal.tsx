@@ -105,7 +105,7 @@ export function SearchModal({ open, onClose, projects, docs }: Props) {
       className="fixed inset-0 bg-ink/40 z-50 flex items-start justify-center pt-[15vh]"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-white border border-vellum-border rounded-vellum shadow-2xl w-full max-w-[560px] flex flex-col overflow-hidden max-h-[60vh]">
+      <div className="bg-white border border-hairline rounded-lg w-full max-w-[560px] flex flex-col overflow-hidden max-h-[60vh]">
         <div className="px-4 py-3 border-b border-vellum-border flex items-center gap-3">
           <span className="text-ink-faint text-sm">⌘K</span>
           <input

@@ -7,7 +7,6 @@ import { ClerkProvider } from '@clerk/nextjs';
 import { TRPCProvider } from '@/components/providers/trpc-provider';
 import { ToastProvider } from '@/lib/toast';
 import { ToastStack } from '@/components/ui/ToastStack';
-import { inter, lora } from "@/lib/fonts";
 import "@/app/globals.css";
 
 export const metadata: Metadata = {
@@ -42,21 +41,14 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width:        "device-width",
   initialScale: 1,
-  themeColor:   "#faf9f5",
+  themeColor:   "#ffffff",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider>
       <TRPCProvider>
-        <html
-          lang="en"
-          // CSS variables for Lora and Inter are injected here so every
-          // component can reference `var(--font-lora)` and `var(--font-inter)`.
-          // Tailwind's font-serif and font-sans utilities pick these up via
-          // the tailwind.config.ts `fontFamily` extension.
-          className={`${inter.variable} ${lora.variable}`}
-        >
+        <html lang="en">
           <body className="font-sans antialiased bg-vellum text-ink">
             <ToastProvider>
               {children}

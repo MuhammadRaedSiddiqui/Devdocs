@@ -9,7 +9,7 @@ interface Props { docs:LibraryDoc[]; domainFilter:DomainId|null; projectFilter:s
 
 function Item({active,onClick,label,count}:{active:boolean;onClick:()=>void;label:string;count:number}) {
   return (
-    <button type="button" onClick={onClick} className={cn("w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-[13px] transition-colors text-left",active?"bg-[#fff2ec] text-ink font-medium":"text-ink-muted hover:bg-vellum-border-light hover:text-ink")}>
+    <button type="button" onClick={onClick} className={cn("w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[14px] transition-colors text-left",active?"bg-hover-veil text-ink font-medium":"text-ink-muted hover:bg-hover-veil hover:text-ink")}>
       {label}<span className="ml-auto text-[11px] text-ink-faint">{count}</span>
     </button>
   );
@@ -19,7 +19,7 @@ export function DocsSidebar({docs,domainFilter,projectFilter,onDomainFilter,onPr
   const domainCounts: Partial<Record<DomainId,number>> = {};
   docs.forEach(d=>{ domainCounts[d.domainId]=(domainCounts[d.domainId]??0)+1; });
   return (
-    <aside className="w-[220px] flex-shrink-0 border-r border-vellum-border bg-vellum flex flex-col py-[18px] overflow-y-auto">
+    <aside className="w-[260px] flex-shrink-0 border-r border-hairline bg-sidebar-mist flex flex-col py-4 overflow-y-auto">
       <div className="px-2 mb-[18px]">
         <Item active={!domainFilter&&!projectFilter} onClick={onReset} label="All documents" count={docs.length}/>
       </div>

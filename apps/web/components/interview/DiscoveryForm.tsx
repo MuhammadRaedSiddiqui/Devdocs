@@ -23,13 +23,13 @@ export function DiscoveryForm({ projectType, onSubmit }: Props) {
     onSubmit({ projectType, teamSize: values.teamSize as TeamSize, timeline: values.timeline as Timeline, budget: values.budget as Budget, experienceLevel: values.experienceLevel as ExperienceLevel });
   }
   return (
-    <div className="flex-1 overflow-y-auto px-10 py-8 max-w-2xl mx-auto w-full">
+    <div className="flex-1 overflow-y-auto px-6 py-8 max-w-[768px] mx-auto w-full bg-white">
       <div className="mb-1">
-        <h2 className="font-serif-heading text-[22px] text-ink mb-1">A few quick questions</h2>
-        <p className="text-[13px] text-ink-muted leading-snug">30 seconds. No typing required. The AI reads all of this before the interview begins.</p>
+        <h2 className="font-serif-heading text-[24px] text-ink mb-1">A few quick questions</h2>
+        <p className="text-[14px] text-ink-muted leading-snug">30 seconds. No typing required. The AI reads all of this before the interview begins.</p>
       </div>
       {/* Project type locked chip — never re-asked */}
-      <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-vellum border border-vellum-border rounded-vellum my-4">
+      <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-sidebar-mist border border-hairline rounded-lg my-4">
         <span className="text-base">{TYPE_ICONS[projectType]}</span>
         <div>
           <div className="text-[13px] text-ink font-medium">{PROJECT_TYPE_LABELS[projectType]}</div>
@@ -42,7 +42,7 @@ export function DiscoveryForm({ projectType, onSubmit }: Props) {
           <legend className="text-[13px] font-medium text-ink mb-2">{f.label}</legend>
           <div className="flex flex-wrap gap-1.5">
             {f.options.map(o => (
-              <button key={o.v} type="button" onClick={()=>setValues(p=>({...p,[f.key]:o.v}))} className={cn("px-3.5 py-1.5 rounded-vellum border text-[13px] transition-colors",values[f.key]===o.v?"bg-ink text-vellum border-ink":"bg-white text-ink-secondary border-ink/15 hover:border-ink/30")}>{o.l}</button>
+              <button key={o.v} type="button" onClick={()=>setValues(p=>({...p,[f.key]:o.v}))} className={cn("px-3.5 py-1.5 rounded-lg border text-[14px] transition-colors",values[f.key]===o.v?"bg-ink text-white border-ink":"bg-white text-ink-secondary border-hairline hover:bg-hover-veil")}>{o.l}</button>
             ))}
           </div>
         </fieldset>

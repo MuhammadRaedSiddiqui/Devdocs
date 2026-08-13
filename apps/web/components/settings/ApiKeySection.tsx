@@ -161,9 +161,9 @@ export function ApiKeySection({ onConnectedChange }: Props) {
       <PageHeader title="API Key" sub="DevDocs AI uses your own API key — Bring Your Own Key (BYOK)." />
 
       {/* BYOK callout */}
-      <div className="flex gap-2.5 p-3.5 rounded-lg border-l-[3px] mb-4" style={{ borderLeftColor: "#0F6E56", background: "#F0FDFA" }}>
+      <div className="flex gap-2.5 p-3.5 rounded-lg border border-hairline bg-sidebar-mist mb-4">
         <span className="text-sm flex-shrink-0 mt-0.5">🔒</span>
-        <div className="text-[12.5px] leading-snug" style={{ color: "#0a4a3d" }}>
+        <div className="text-[12.5px] leading-snug text-ink-secondary">
           <strong className="font-medium">Your API keys are encrypted and stored securely.</strong> Keys are
           sent once over HTTPS to the DevDocs AI server, verified, and encrypted at rest with AES-256-GCM.
           They&apos;re never returned to the browser after saving, and all AI calls are made server-side —
@@ -185,7 +185,7 @@ export function ApiKeySection({ onConnectedChange }: Props) {
             >
               {p === "anthropic" ? "Anthropic" : p === "openai" ? "OpenAI" : "Meta Muse"}
               {states[p].connected && (
-                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#1D9E75" }} />
+                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-ink" />
               )}
             </button>
           ))}
@@ -196,7 +196,7 @@ export function ApiKeySection({ onConnectedChange }: Props) {
           <>
             <div className="flex items-center justify-between p-3.5 bg-vellum border border-vellum-border rounded-lg">
               <div className="flex items-center gap-2.5">
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "#1D9E75" }} />
+                <span className="w-2 h-2 rounded-full flex-shrink-0 bg-ink" />
                 <div>
                   <div className="font-mono text-[12.5px] text-ink">{s.maskedKey}</div>
                   <div className="text-[11px] text-ink-faint mt-0.5">
@@ -217,28 +217,23 @@ export function ApiKeySection({ onConnectedChange }: Props) {
               <button
                 type="button"
                 onClick={() => update(activeTab, { showRemove: true })}
-                className="px-4 py-1.5 border rounded-lg text-xs"
-                style={{ borderColor: "#f3c4c4", color: "#c0392b" }}
+                className="px-4 py-1.5 border border-hairline rounded-lg text-xs text-ink-secondary hover:bg-hover-veil"
               >
                 Remove key
               </button>
             </div>
 
             {s.showRemove && (
-              <div
-                className="flex gap-2.5 p-3.5 rounded-lg border-l-[3px] mt-3.5"
-                style={{ borderLeftColor: "#c0392b", background: "#fdf2f2" }}
-              >
+              <div className="flex gap-2.5 p-3.5 rounded-lg border border-hairline bg-sidebar-mist mt-3.5">
                 <span className="text-sm">⚠</span>
-                <div className="text-[12.5px]" style={{ color: "#7a2418" }}>
+                <div className="text-[12.5px] text-ink-secondary">
                   Remove your {providerLabel} key? You won&apos;t be able to use it for
                   interviews until you add it again.
                   <div className="flex gap-2 mt-2.5">
                     <button
                       type="button"
                       onClick={() => handleRemove(activeTab)}
-                      className="px-3.5 py-1.5 rounded-lg text-xs text-white"
-                      style={{ background: "#c0392b" }}
+                      className="px-3.5 py-1.5 rounded-lg text-xs text-white bg-ink"
                     >
                       Remove key
                     </button>
@@ -267,7 +262,7 @@ export function ApiKeySection({ onConnectedChange }: Props) {
                 className="w-full px-3 py-2.5 border border-ink/15 rounded-lg text-[13px] bg-white text-ink font-mono focus:outline-none focus:border-ink/30"
               />
               {s.verifyError && (
-                <div className="text-[11px] mt-1.5" style={{ color: "#c0392b" }}>{s.verifyError}</div>
+                <div className="text-[11px] mt-1.5 text-ink-muted">{s.verifyError}</div>
               )}
               <div className="text-[11px] text-ink-faint mt-1.5">
                 {activeTab === "anthropic" ? (
@@ -337,7 +332,7 @@ export function ApiKeySection({ onConnectedChange }: Props) {
                     {`${PROVIDER_MODELS[p].label} · ${PROVIDER_MODELS[p].default}`}
                   </div>
                   {!connected && (
-                    <div className="text-[11px] mt-0.5" style={{ color: "#9c9a92" }}>
+                    <div className="text-[11px] mt-0.5 text-ink-faint">
                       Add a key above to enable
                     </div>
                   )}
@@ -347,7 +342,7 @@ export function ApiKeySection({ onConnectedChange }: Props) {
                     <span className="text-[10px] px-2 py-0.5 rounded-full font-medium badge-green">Active</span>
                   )}
                   {!connected && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-[#ece9e1] text-ink-muted">No key</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-none font-medium bg-sidebar-mist text-ink-muted">No key</span>
                   )}
                   <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
                     isActive && connected ? "border-ink" : "border-vellum-border"
@@ -389,7 +384,7 @@ export function ApiKeySection({ onConnectedChange }: Props) {
                   <span className="text-[10px] px-2 py-0.5 rounded-full font-medium badge-amber">Server</span>
                 </>
               ) : (
-                <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-[#ece9e1] text-ink-muted">
+                <span className="text-[10px] px-2 py-0.5 rounded-none font-medium bg-sidebar-mist text-ink-muted">
                   Not configured
                 </span>
               )}
@@ -416,9 +411,9 @@ export function ApiKeySection({ onConnectedChange }: Props) {
       {/* Bedrock info card */}
       <Card title="Amazon Bedrock" sub="Use Claude via AWS infrastructure — server-configured only.">
         {bedrockStatus?.configured ? (
-          <div className="flex gap-2.5 p-3.5 rounded-lg border-l-[3px]" style={{ borderLeftColor: "#0F6E56", background: "#F0FDFA" }}>
+          <div className="flex gap-2.5 p-3.5 rounded-lg border border-hairline bg-sidebar-mist">
             <span className="text-sm flex-shrink-0">✓</span>
-            <div className="text-[12.5px] leading-snug" style={{ color: "#0a4a3d" }}>
+            <div className="text-[12.5px] leading-snug text-ink-secondary">
               <strong className="font-medium">Bedrock is configured.</strong> Using region{" "}
               <code className="font-mono text-[11px]">{bedrockStatus.region}</code> with model{" "}
               <code className="font-mono text-[11px]">{bedrockStatus.model}</code>.
@@ -427,7 +422,7 @@ export function ApiKeySection({ onConnectedChange }: Props) {
             </div>
           </div>
         ) : (
-          <div className="flex gap-2.5 p-3.5 rounded-lg border-l-[3px]" style={{ borderLeftColor: "#dedcd1", background: "#faf9f5" }}>
+          <div className="flex gap-2.5 p-3.5 rounded-lg border border-hairline bg-sidebar-mist">
             <span className="text-sm flex-shrink-0 text-ink-faint">○</span>
             <div className="text-[12.5px] leading-snug text-ink-muted">
               Bedrock is not configured on this server. Add{" "}
