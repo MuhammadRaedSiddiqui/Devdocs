@@ -256,7 +256,7 @@ function runReply(
 function runOpener(set: SetFn, get: GetFn, domainId: DomainId) {
   const d     = DOMAINS.find(x => x.id === domainId)!;
   const opener = getOpener(domainId, get().lockedContext!, get().elaboration);
-  const opts: Partial<ChatMessage> = d.mode === "cards" ? { showCards: domainId } : {};
+  const opts: Partial<ChatMessage> = d.mode === "cards" ? { showCards: domainId, domainId } : { domainId };
   runReply(set, get, opener, opts, undefined, true);
 }
 
@@ -416,7 +416,7 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
       if (state.sessionLogger) {
         state.sessionLogger.logUserMessage(`Skipped: ${domainLabel}`, domain, { cardChoices: { [key]: value } });
       }
-      set(s => ({ messages: [...s.messages, { role: "user" as const, content: `Skipped: ${domainLabel}` }], messageCount: s.messageCount + 1 }));
+      set(s => ({ messages: [...s.messages, { role: "user" as const, content: `Skipped: ${domainLabel}`, domainId: domain }], messageCount: s.messageCount + 1 }));
       return;
     } else if (value.startsWith("custom:")) {
       label = value.slice(7);
@@ -435,11 +435,11 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
     }
 
     // Push user "message" (the card selection) then immediately trigger doc gen
-    set(s => ({ messages: [...s.messages, { role: "user" as const, content: `Selected: ${label}` }], messageCount: s.messageCount + 1 }));
+    set(s => ({ messages: [...s.messages, { role: "user" as const, content: `Selected: ${label}`, domainId: domain }], messageCount: s.messageCount + 1 }));
     runReply(
       set, get,
       `The user selected "${label}" for ${domainLabel}. Acknowledge the choice briefly (one sentence) and generate the ${domainLabel} documentation section.`,
-      {},
+      { domainId: domain },
       (content) => completeDomain(set, get, domain, content),
       true
     );
@@ -453,7 +453,7 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
     // Validation: planning elaboration should be meaningful (≥10 chars, ideally 20)
     if (domain === "planning" && text.trim().length < 10) {
       const hint = "Could you share a bit more detail? Even one sentence about who it's for and what a user does helps me tailor the rest.";
-      set(s => ({ messages: [...s.messages, { role: "assistant" as const, content: hint }], messageCount: s.messageCount + 1 }));
+      set(s => ({ messages: [...s.messages, { role: "assistant" as const, content: hint, domainId: domain }], messageCount: s.messageCount + 1 }));
       return;
     }
 
@@ -463,11 +463,11 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
       state.sessionLogger.logUserMessage(text, domain);
     }
 
-    set(s => ({ messages: [...s.messages, { role: "user" as const, content: text }], lastUserMessage: text, messageCount: s.messageCount + 1 }));
+    set(s => ({ messages: [...s.messages, { role: "user" as const, content: text, domainId: domain }], lastUserMessage: text, messageCount: s.messageCount + 1 }));
 
     // Post-completion clarification
     if (get().isComplete) {
-      runReply(set, get, text, {});
+      runReply(set, get, text, { domainId: domain });
       return;
     }
 
@@ -477,17 +477,17 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
         runReply(
           set, get,
           `The user described their project: "${text}". Briefly acknowledge this (1-2 sentences), then generate the Planning & Scope documentation section.`,
-          {},
+          { domainId: domain },
           (content) => completeDomain(set, get, "planning", content),
           true
         );
       } else {
-        runReply(set, get, text, {}, (content) => completeDomain(set, get, domain, content));
+        runReply(set, get, text, { domainId: domain }, (content) => completeDomain(set, get, domain, content));
       }
 
     } else {
       // "cards" mode — user typed instead of clicking a card, keep picker visible
-      runReply(set, get, text, { showCards: domain });
+      runReply(set, get, text, { showCards: domain, domainId: domain });
     }
   },
 
@@ -556,20 +556,45 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
     const targetIdx = activeIds.indexOf(domainId);
     if (targetIdx === -1) return;
     const toRemove = new Set(activeIds.slice(targetIdx));
-    set(state => ({
-      currentDomain: domainId,
-      completedDomains: state.completedDomains.filter(id => !toRemove.has(id)),
-      isComplete: false,
-      domainPhases: Object.fromEntries(
-        DOMAINS.map(d => [
-          d.id,
-          state.completedDomains.includes(d.id) && !toRemove.has(d.id) ? "complete"
-          : d.id === domainId ? "interviewing"
-          : "not_started",
-        ])
-      ) as Record<DomainId, DomainPhase>,
-    }));
-    // Clear any locked choice for this domain so user can re-pick? Keep for now — user can overwrite.
+    set(state => {
+      // Find first message belonging to toRemove, then truncate from there
+      const firstIdx = state.messages.findIndex(m => {
+        const md = (m as ChatMessage & { domainId?: DomainId }).domainId;
+        if (md && toRemove.has(md)) return true;
+        if (m.showCards && toRemove.has(m.showCards)) return true;
+        return false;
+      });
+      const nextMessages = firstIdx === -1
+        ? state.messages.filter(m => {
+            const md = (m as ChatMessage & { domainId?: DomainId }).domainId;
+            if (md && toRemove.has(md)) return false;
+            if (m.showCards && toRemove.has(m.showCards)) return false;
+            return true;
+          })
+        : state.messages.slice(0, firstIdx);
+      const nextContent = { ...state.domainContent };
+      const nextChoices = { ...state.lockedChoices };
+      for (const id of toRemove) {
+        delete nextContent[id as DomainId];
+        delete nextChoices[id as DomainId];
+      }
+      return {
+        currentDomain: domainId,
+        completedDomains: state.completedDomains.filter(id => !toRemove.has(id)),
+        domainContent: nextContent,
+        lockedChoices: nextChoices,
+        messages: nextMessages,
+        isComplete: false,
+        domainPhases: Object.fromEntries(
+          DOMAINS.map(d => [
+            d.id,
+            state.completedDomains.includes(d.id) && !toRemove.has(d.id) ? "complete"
+            : d.id === domainId ? "interviewing"
+            : "not_started",
+          ])
+        ) as Record<DomainId, DomainPhase>,
+      };
+    });
     // Re-emit opener for the domain if no picker already present
     get().replayOpenerForCurrentDomain();
   },

@@ -41,6 +41,7 @@ export interface ChatMessage {
   showCards?:   DomainId;
   isComplete?:  boolean;
   showDownload?: boolean;
+  domainId?:    DomainId;
 }
 
 export interface SchemaField {
