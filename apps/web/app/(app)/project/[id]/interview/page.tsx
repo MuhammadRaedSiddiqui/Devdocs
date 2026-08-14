@@ -14,6 +14,7 @@ import type { AIProvider } from "@/lib/ai/provider";
 import { trpc } from "@/lib/trpc";
 import type { ChatMessage, DomainId, ProjectContext, ProjectType } from "@/lib/types";
 import { useAuth } from "@clerk/nextjs";
+import { useToast } from "@/lib/toast";
 
 const PROVIDER_LABELS: Record<AIProvider, string> = {
   anthropic: "Anthropic",
@@ -39,6 +40,7 @@ function readSavedInterviewData(value: unknown): SavedInterviewData | null {
 export default function InterviewPage({ params }: { params: { id: string } }) {
   const store = useInterviewStore();
   const { getToken } = useAuth();
+  const { toast } = useToast();
   const [hydrated, setHydrated] = useState(false);
   const hasHydrated = useRef(false);
   const [domainsSheet, setDomainsSheet] = useState(false);
@@ -175,8 +177,8 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
         <span className="text-[13px] text-ink-muted hidden sm:inline">{projectQuery.data.name}</span>
         <div className="ml-auto flex items-center gap-2">
           {store.currentProvider && (
-            <span className="text-[11px] px-2.5 py-1 rounded-full border border-vellum-border text-ink-faint bg-white hidden sm:inline">
-              {PROVIDER_LABELS[store.currentProvider] ?? store.currentProvider}
+            <span title="Per-project provider — stays on reload" className="text-[11px] px-2.5 py-1 rounded-full border border-vellum-border text-ink-faint bg-white hidden sm:inline">
+              {PROVIDER_LABELS[store.currentProvider] ?? store.currentProvider} <span className="opacity-60">· per-project</span>
             </span>
           )}
             <span className="text-[11px] px-3 py-1 rounded-none font-medium bg-sidebar-mist border border-hairline text-ink">
@@ -193,7 +195,7 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
         <>
           {/* Desktop: three-panel layout */}
           <div className="hidden md:flex flex-row h-[calc(100vh-52px)] overflow-hidden">
-            <DomainProgress />
+            <DomainProgress onRevisit={(id) => { const label = store.activeDomains.find(d=>d.id===id)?.label ?? id; toast(`Rewound to ${label}`, "info"); }} />
             <ChatPanel />
             <PreviewPanel />
           </div>
@@ -232,7 +234,7 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
 
           {/* Bottom sheets for mobile */}
           <BottomSheet open={domainsSheet} onClose={() => setDomainsSheet(false)} title="Interview Progress">
-            <DomainProgress />
+            <DomainProgress onRevisit={(id) => { setDomainsSheet(false); const label = store.activeDomains.find(d=>d.id===id)?.label ?? id; toast(`Rewound to ${label}`, "info"); }} />
           </BottomSheet>
           {store.isComplete && (
             <BottomSheet open={previewSheet} onClose={() => setPreviewSheet(false)} title="DOCUMENTATION.md">

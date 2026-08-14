@@ -1,6 +1,6 @@
 "use client";
 import { useInterviewStore } from "@/lib/interview/store";
-export function DomainProgress() {
+export function DomainProgress({ onRevisit }: { onRevisit?: (id: string) => void }) {
   const { completedDomains, currentDomain, isComplete, activeDomains } = useInterviewStore();
   const goBackToDomain = useInterviewStore(s => s.goBackToDomain);
   const isThinking = useInterviewStore(s => s.isThinking);
@@ -22,8 +22,9 @@ export function DomainProgress() {
             </>
           );
           return canGoBack ? (
-            <button key={d.id} type="button" onClick={()=>goBackToDomain(d.id)} aria-label={`Revisit ${d.label}`} className="w-full flex items-center gap-2 px-4 py-2 transition-colors hover:bg-hover-veil text-left">
+            <button key={d.id} type="button" onClick={()=>{ goBackToDomain(d.id); onRevisit?.(d.id); }} aria-label={`Revisit ${d.label}`} title="Click to revisit this domain" className="group w-full flex items-center gap-2 px-4 py-2 transition-colors hover:bg-hover-veil text-left">
               {row}
+              <span className="ml-auto text-[10px] text-ink-faint opacity-0 group-hover:opacity-100 transition-opacity">↩ revisit</span>
             </button>
           ) : (
             <div key={d.id} aria-current={active ? "step" : undefined} className={`flex items-center gap-2 px-4 py-2 transition-colors ${active?"bg-hover-veil":""}`}>
