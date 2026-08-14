@@ -29,12 +29,9 @@ function Dots() {
 }
 function ResponseStatus({ streaming }: { streaming: boolean }) {
   return (
-    <div className="flex gap-2.5 items-start" aria-live="polite">
-      <Avatar role="assistant" />
-      <div className="flex items-center gap-2 bg-white border border-hairline rounded-lg px-3.5 py-3 text-[13px] text-ink-muted">
-        <Dots />
-        <span>{streaming ? "Responding…" : "Thinking…"}</span>
-      </div>
+    <div className="flex items-center gap-2 px-1 py-1 text-[11px] text-ink-faint" aria-live="polite">
+      <Dots />
+      <span>{streaming ? "Responding…" : "Thinking…"}</span>
     </div>
   );
 }
