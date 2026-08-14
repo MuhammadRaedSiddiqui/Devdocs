@@ -4,15 +4,15 @@ import Link from "next/link";
 
 export function ErrorBanner() {
   const lastError = useInterviewStore(s => s.lastError);
-  const clearError = useInterviewStore(s => s.clearError);
-  const sendMessage = useInterviewStore(s => s.sendMessage);
+  const retryLast = useInterviewStore(s => s.retryLast);
 
   if (!lastError) return null;
 
+  const isRateLimit = lastError.type === "rate_limit";
+
   function handleRetry() {
-    const msg = lastError!.lastUserMessage;
-    clearError();
-    if (msg) sendMessage(msg);
+    if (isRateLimit) return;
+    retryLast();
   }
 
   return (
@@ -32,15 +32,14 @@ export function ErrorBanner() {
             Check API key
           </Link>
         )}
-        {lastError.lastUserMessage && (
-          <button
-            type="button"
-            onClick={handleRetry}
-            className="px-3 py-1.5 text-[12px] font-medium bg-ink text-vellum rounded-vellum"
-          >
-            Try again
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={handleRetry}
+          disabled={isRateLimit}
+          className="px-3 py-1.5 text-[12px] font-medium bg-ink text-vellum rounded-vellum disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Try again
+        </button>
       </div>
     </div>
   );

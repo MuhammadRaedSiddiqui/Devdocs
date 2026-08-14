@@ -12,7 +12,7 @@ import { getActiveConfig } from "@/lib/ai/provider";
 import { setAISession } from "@/lib/ai/provider";
 import type { AIProvider } from "@/lib/ai/provider";
 import { trpc } from "@/lib/trpc";
-import type { ChatMessage, DomainId, ProjectContext, ProjectType, SchemaTables } from "@/lib/types";
+import type { ChatMessage, DomainId, ProjectContext, ProjectType } from "@/lib/types";
 import { useAuth } from "@clerk/nextjs";
 
 const PROVIDER_LABELS: Record<AIProvider, string> = {
@@ -29,8 +29,6 @@ type SavedInterviewData = {
   domainContent?: Partial<Record<DomainId, string>>;
   conversationHistory?: ChatMessage[];
   elaboration?: string;
-  schemaTables?: SchemaTables;
-  schemaConfirmed?: boolean;
 };
 
 function readSavedInterviewData(value: unknown): SavedInterviewData | null {
@@ -103,11 +101,12 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
           domainContent: saved.domainContent ?? {},
           conversationHistory: saved.conversationHistory ?? [],
           elaboration: saved.elaboration ?? "",
-          schemaTables: saved.schemaTables,
-          schemaConfirmed: saved.schemaConfirmed,
         });
-        if (!useInterviewStore.getState().isComplete) {
-          void useInterviewStore.getState().initializeSession(getToken);
+        const s = useInterviewStore.getState();
+        if (!s.isComplete) {
+          // Restore card picker if hydration stripped it (refresh mid-cards)
+          s.replayOpenerForCurrentDomain();
+          void s.initializeSession(getToken);
         }
       } else {
         store.resumeFromSaved({
@@ -117,8 +116,6 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
           domainContent: {},
           conversationHistory: [],
           elaboration: saved.elaboration ?? "",
-          schemaTables: saved.schemaTables,
-          schemaConfirmed: saved.schemaConfirmed,
         });
         store.setLockedContext(saved.lockedContext);
       }
@@ -142,8 +139,6 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
             domainContent: store.domainContent,
             conversationHistory: store.messages,
             elaboration: store.elaboration,
-            schemaTables: store.schemaTables,
-            schemaConfirmed: store.schemaConfirmed,
           },
         },
       };
@@ -160,8 +155,6 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
     store.domainContent,
     store.messages,
     store.elaboration,
-    store.schemaTables,
-    store.schemaConfirmed,
     flushQueuedSave,
   ]);
 

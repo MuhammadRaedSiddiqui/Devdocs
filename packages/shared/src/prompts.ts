@@ -41,6 +41,7 @@ export function buildSystemPrompt(
   const domainLabel  = DOMAIN_LABELS[domainId];
   const domainFile   = DOMAIN_FILES[domainId];
   const choicesSummary = buildChoicesSummary(lockedChoices);
+  const autoSchemaBlock = domainId === "database" ? getAutoSchemaHint(ctx, elaboration, lockedChoices) : "";
 
   return `You are a senior software architect helping a developer plan a ${typeLabel} project before writing any code. Your role is to ask precise, targeted questions and produce structured documentation that AI coding agents (Claude Code, Cursor, Windsurf) can consume directly.
 
@@ -54,6 +55,7 @@ ${elaboration ? `- Project description: ${elaboration}` : "- Project description
 
 ## Decisions already locked
 ${choicesSummary || "None yet — this is the first domain."}
+${autoSchemaBlock}
 
 ## Current domain
 ${domainLabel} (output file: ${domainFile})
@@ -64,6 +66,7 @@ ${domainLabel} (output file: ${domainFile})
 - When a choice has already been locked, never re-ask for it. Reference it and build on it.
 - For open-ended domains (planning, api, frontend): ask exactly one focused question per turn, then wait.
 - For document generation: output clean markdown only. No preamble or explanation around the markdown block.
+${domainId === "database" ? "- Database is card-only: user picked platform only. Generate DATABASE.md with Platform, Rationale, and Data Model (3-5 tables, fields with TYPE and note, FKs, RLS where applicable). Do not ask user to define tables — propose and assume." : ""}
 
 ## Document output format (when generating)
 \`\`\`
@@ -81,6 +84,33 @@ Rules:
 - Code/identifiers: backtick inline code
 - No HTML. No tables. No bullet lists unless genuinely appropriate.
 - 150–300 words per domain section.`;
+}
+
+function getAutoSchemaHint(
+  ctx: ProjectContext,
+  elaboration: string,
+  lockedChoices: Partial<Record<DomainId, Record<string, string>>>
+): string {
+  const platform = lockedChoices.database?.databasePlatform ?? "managed_postgres";
+  const platformLabel: Record<string, string> = {
+    supabase: "Supabase Postgres (RLS, auth.users)",
+    managed_postgres: "Managed PostgreSQL",
+    firebase: "Firebase Firestore",
+  };
+  const byType: Record<string, string> = {
+    saas: "organizations, memberships (project_id, user_id, role), projects",
+    api: "api_keys, webhooks, usage_events",
+    internal_tool: "records, audit_logs, approvals",
+    mobile: "users, devices, push_tokens",
+    landing_page: "leads, analytics_events",
+    other: "core entities inferred from description",
+  };
+  const hint = elaboration ? elaboration.slice(0, 120).replace(/\n/g, " ") : "core app entities";
+  return `
+## Auto schema hint (do not ask user — synthesize)
+- Platform: ${platformLabel[platform] ?? platform}
+- Start with users/profiles, then ${byType[ctx.projectType] ?? byType.other}
+- Keep 3–5 tables, include id (uuid), created_at (timestamptz), FKs with cascade, RLS notes where applicable. Hint: "${hint}"`;
 }
 
 function buildChoicesSummary(

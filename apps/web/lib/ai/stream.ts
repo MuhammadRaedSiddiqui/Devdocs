@@ -29,8 +29,15 @@ export async function streamAIResponse(
       }),
     });
     if (!response.ok || !response.body) {
-      const payload = await response.json().catch(() => null) as { message?: string } | null;
-      callbacks.onError(response.status === 401 ? 'auth' : 'unknown', payload?.message ?? 'Unable to start AI generation.'); return;
+      const payload = await response.json().catch(() => null) as { message?: string; error?: string } | null;
+      const msg = payload?.message ?? 'Unable to start AI generation.';
+      if (response.status === 401) { callbacks.onError('auth', msg); return; }
+      if (response.status === 429) {
+        const retryAfter = response.headers.get('retry-after');
+        const suffix = retryAfter ? ` Try again in ${retryAfter}s.` : '';
+        callbacks.onError('rate_limit', `${msg}${suffix}`); return;
+      }
+      callbacks.onError('unknown', msg); return;
     }
     const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = '';
     while (true) {

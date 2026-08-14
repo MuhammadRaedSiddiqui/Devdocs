@@ -2,30 +2,13 @@
 // Real AI streaming wired via lib/ai/stream.ts — supports Anthropic + OpenAI.
 // Integration point remaining: persistToSupabase() (see prompt 3).
 import { create } from "zustand";
-import type { ChatMessage, DomainDefinition, DomainId, DomainPhase, ProjectContext, SchemaTables } from "@/lib/types";
+import type { ChatMessage, DomainDefinition, DomainId, DomainPhase, ProjectContext } from "@/lib/types";
 import { DOMAINS, getActiveDomains, getOpener, buildFullDocument, nextDomainId } from "@/lib/interview/domains";
 import { CARD_CHOICES } from "@/lib/interview/choices";
 import { getActiveConfig, type AIProvider } from "@/lib/ai/provider";
 import { streamAIResponse, type StreamErrorType } from "@/lib/ai/stream";
 import { SessionLogger } from "@/lib/session/logger";
 import type { MessageMetadata } from "@devdocs/shared";
-
-const DEFAULT_SCHEMA: SchemaTables = {
-  users: [
-    { field: "id",           type: "uuid",        note: "Primary key, auto-generated" },
-    { field: "email",        type: "text",        note: "Unique, required" },
-    { field: "display_name", type: "text",        note: "Optional" },
-    { field: "created_at",   type: "timestamptz", note: "Auto-set on insert" },
-  ],
-};
-
-// Shown when the user asks a schema help question — keeps the schema card
-// visible and teaches without advancing the domain.
-const HELP_RESPONSES = [
-  "Here's what each field does:\n\n**id** — unique identifier, auto-generated, you never set this\n**email** — the login email, must be unique across all users\n**display_name** — optional, shown in the UI\n**created_at** — records when the account was created, automatically",
-  "A **foreign key (FK)** links two tables. It means 'this row belongs to a row in another table'. If the parent is deleted, child rows are deleted automatically too (cascade delete).",
-  "Use `timestamptz` over plain `timestamp`. It stores in UTC and your app converts to local time on read. Always prefer this.",
-];
 
 // Error messages shown in the chat when a stream fails
 const ERROR_MESSAGES: Record<StreamErrorType, string> = {
@@ -40,6 +23,10 @@ export interface LastError {
   type: StreamErrorType;
   message: string;
   lastUserMessage: string;
+  source: "choice" | "message" | "opener";
+  retryDomain?: DomainId;
+  retryKey?: string;
+  retryValue?: string;
 }
 
 interface InterviewState {
@@ -52,9 +39,6 @@ interface InterviewState {
   domainContent:    Partial<Record<DomainId, string>>;
   messages:         ChatMessage[];
   elaboration:      string;
-  schemaTables:     SchemaTables;
-  schemaConfirmed:  boolean;
-  helpIndex:        number;
   activeDomains:    DomainDefinition[];
 
   // Project metadata
@@ -87,12 +71,12 @@ interface InterviewState {
   setProvider:       (p: AIProvider) => void;
   lockDomainChoice:  (domain: DomainId, key: string, value: string) => void;
   sendMessage:       (text: string) => void;
-  confirmSchema:     () => void;
-  addSchemaField:    (table: string, field: string, type: string, note: string) => void;
   setDomainContent:  (domainId: DomainId, content: string) => void;
   regenerateDomain:  (domainId: DomainId) => void;
   cancelStream:      () => void;
   clearError:        () => void;
+  retryLast:         () => void;
+  replayOpenerForCurrentDomain: () => void;
   resumeFromSaved:   (data: {
     lockedContext:       ProjectContext;
     lockedChoices:       Partial<Record<DomainId, Record<string, string>>>;
@@ -100,8 +84,6 @@ interface InterviewState {
     domainContent:       Partial<Record<DomainId, string>>;
     conversationHistory: ChatMessage[];
     elaboration:         string;
-    schemaTables?:       SchemaTables;
-    schemaConfirmed?:    boolean;
   }) => void;
   reset: () => void;
 }
@@ -170,7 +152,7 @@ function runReply(
     set(s => ({
       isThinking: false, isStreaming: false, streamingText: "",
       abortController: null,
-      lastError: { type: "timeout", message: errMsg, lastUserMessage: userMessage },
+      lastError: { type: "timeout", message: errMsg, lastUserMessage: userMessage, source: isInternalOpener ? "opener" as const : "message" as const },
       messages: [...s.messages, { role: "assistant" as const, content: errMsg }],
       messageCount: s.messageCount + 1,
     }));
@@ -207,13 +189,16 @@ function runReply(
           // an empty chat bubble; surface a retryable error instead.
           if (!content) {
             const message = "The AI response was empty. Please try again.";
-            set({
+            const emptyMsg: ChatMessage = { role: "assistant" as const, content: message };
+            set(s => ({
               isThinking: false,
               isStreaming: false,
               streamingText: "",
               abortController: null,
-              lastError: { type: "unknown", message, lastUserMessage: userMessage },
-            });
+              lastError: { type: "unknown", message, lastUserMessage: userMessage, source: isInternalOpener ? "opener" as const : "message" as const },
+              messages: [...s.messages, emptyMsg],
+              messageCount: s.messageCount + 1,
+            }));
             return;
           }
 
@@ -221,11 +206,9 @@ function runReply(
           const metadata: MessageMetadata = {
             messageType: msgOpts.isComplete ? "completion" :
                         isInternalOpener ? "opener" :
-                        msgOpts.showCards ? "card_picker" :
-                        msgOpts.showSchema ? "schema_builder" : "follow-up",
+                        msgOpts.showCards ? "card_picker" : "follow-up",
             isOpener: isInternalOpener,
             showsCardPicker: msgOpts.showCards !== undefined,
-            showsSchemaBuilder: msgOpts.showSchema !== undefined,
           };
 
           // Log assistant message with timing data
@@ -257,7 +240,7 @@ function runReply(
             streamingText:   "",
             isThinking:      false,
             abortController: null,
-            lastError:       { type, message, lastUserMessage: userMessage },
+            lastError:       { type, message, lastUserMessage: userMessage, source: isInternalOpener ? "opener" as const : "message" as const },
             messages:        [...s.messages, { role: "assistant" as const, content: message }],
             messageCount:    s.messageCount + 1,
           }));
@@ -271,9 +254,7 @@ function runReply(
 function runOpener(set: SetFn, get: GetFn, domainId: DomainId) {
   const d     = DOMAINS.find(x => x.id === domainId)!;
   const opener = getOpener(domainId, get().lockedContext!, get().elaboration);
-  const opts: Partial<ChatMessage> =
-    d.mode === "cards"  ? { showCards: domainId } :
-    d.mode === "schema" ? { showSchema: true }     : {};
+  const opts: Partial<ChatMessage> = d.mode === "cards" ? { showCards: domainId } : {};
   runReply(set, get, opener, opts, undefined, true);
 }
 
@@ -334,9 +315,6 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
   domainContent:    {},
   messages:         [],
   elaboration:      "",
-  schemaTables:     DEFAULT_SCHEMA,
-  schemaConfirmed:  false,
-  helpIndex:        0,
   activeDomains:    DOMAINS,
   projectName:      "",
   projectId:        null,
@@ -450,7 +428,6 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
     if (!text.trim() || get().isThinking || get().isStreaming) return;
     const domain = get().currentDomain;
     const d      = DOMAINS.find(x => x.id === domain)!;
-    const low    = text.toLowerCase();
 
     // Log user message to session
     const state = get();
@@ -480,77 +457,10 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
         runReply(set, get, text, {}, (content) => completeDomain(set, get, domain, content));
       }
 
-    } else if (d.mode === "schema") {
-      if (/help|what|explain|mean|\?/.test(low)) {
-        // Schema help — keep schema visible, don't advance
-        const r = HELP_RESPONSES[get().helpIndex % HELP_RESPONSES.length];
-        set(s => ({ helpIndex: s.helpIndex + 1 }));
-        // For schema help we still use real AI but seed the conversation with the help request
-        runReply(set, get, text, { showSchema: true });
-      } else if (get().schemaConfirmed) {
-        runReply(set, get, text, {});
-      } else if (/good|ok|fine|done|confirm|lock|yes/.test(low)) {
-        get().confirmSchema();
-      } else {
-        runReply(set, get, text, { showSchema: true });
-      }
     } else {
-      // "cards" mode — user typed instead of clicking a card
+      // "cards" mode — user typed instead of clicking a card, keep picker visible
       runReply(set, get, text, { showCards: domain });
     }
-  },
-
-  confirmSchema: () => {
-    if (get().schemaConfirmed) return;
-    set({ schemaConfirmed: true });
-
-    // Log schema confirmation
-    const state = get();
-    if (state.sessionLogger) {
-      state.sessionLogger.logUserMessage("Confirmed schema", "database", {
-        schemaAction: { type: "confirm_schema" },
-      });
-    }
-    set(s => ({ messageCount: s.messageCount + 1 }));
-
-    runReply(
-      set, get,
-      "The user confirmed the database schema. Acknowledge it (one sentence) and generate the Database Design documentation section.",
-      {},
-      (content) => completeDomain(set, get, "database", content),
-      true
-    );
-  },
-
-  addSchemaField: (table, field, type, note) => {
-    set(s => ({
-      schemaTables: {
-        ...s.schemaTables,
-        [table]: [...(s.schemaTables[table] ?? []), { field, type, note }],
-      },
-    }));
-
-    // Log schema field addition
-    const state = get();
-    if (state.sessionLogger) {
-      state.sessionLogger.logUserMessage(`Added field: ${field} to ${table}`, "database", {
-        schemaAction: {
-          type: "add_field",
-          table,
-          field,
-          fieldType: type,
-        },
-      });
-    }
-    set(s => ({ messageCount: s.messageCount + 1 }));
-
-    runReply(
-      set, get,
-      `The user added a field named "${field}" (type: ${type}) to the ${table} table. Acknowledge it briefly and ask if they want to add anything else before confirming the schema.`,
-      { showSchema: true },
-      undefined,
-      true
-    );
   },
 
   setDomainContent: (domainId, content) => {
@@ -579,21 +489,54 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
 
   clearError: () => set({ lastError: null }),
 
+  retryLast: () => {
+    const err = get().lastError;
+    if (!err) return;
+    const { lastUserMessage, source, retryDomain, retryKey, retryValue } = err;
+    get().clearError();
+    if (source === "choice" && retryDomain && retryKey && retryValue) {
+      get().lockDomainChoice(retryDomain, retryKey, retryValue);
+      return;
+    }
+    if (lastUserMessage) {
+      get().sendMessage(lastUserMessage);
+    }
+  },
+
+  replayOpenerForCurrentDomain: () => {
+    const s = get();
+    if (s.isComplete || !s.lockedContext) return;
+    const cur = s.activeDomains.find(d => d.id === s.currentDomain);
+    if (!cur || s.completedDomains.includes(cur.id)) return;
+    const alreadyHasPicker = s.messages.some(m => m.showCards === cur.id);
+    if (alreadyHasPicker) return;
+    const opener = getOpener(cur.id, s.lockedContext, s.elaboration);
+    const opts: Partial<ChatMessage> = cur.mode === "cards" ? { showCards: cur.id } : {};
+    // Push opener as local assistant message without AI call — zero cost, instant picker restore
+    set(state => ({
+      messages: [...state.messages, { role: "assistant" as const, content: opener, ...opts }],
+      messageCount: state.messageCount + 1,
+    }));
+  },
+
   resumeFromSaved: (data) => {
     const active = getActiveDomains(data.lockedContext.projectType);
     const activeCompleted = data.completedDomains.filter(id => active.some(d => d.id === id));
     const nextIdx = active.findIndex(d => !activeCompleted.includes(d.id));
+    // Strip legacy showSchema if present (schema mode removed); keep showCards for hydration
+    const cleaned = (data.conversationHistory ?? [])
+      .filter(message => message.content.trim().length > 0)
+      .map(message => {
+        const { showSchema: _ignored, ...rest } = message as ChatMessage & { showSchema?: boolean };
+        return rest as ChatMessage;
+      });
     set({
       lockedContext:    data.lockedContext,
       lockedChoices:    data.lockedChoices,
       completedDomains: data.completedDomains,
       domainContent:    data.domainContent,
-      messages:         data.conversationHistory
-        .filter(message => message.content.trim().length > 0)
-        .map(message => ({ ...message, showSchema: false })),
+      messages:         cleaned,
       elaboration:      data.elaboration,
-      schemaTables:     data.schemaTables ?? DEFAULT_SCHEMA,
-      schemaConfirmed:  data.schemaConfirmed ?? false,
       activeDomains:    active,
       currentDomain:    nextIdx === -1 ? active[active.length - 1].id : active[nextIdx].id,
       isComplete:       nextIdx === -1,
@@ -614,8 +557,7 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
     set({
       lockedContext: null, lockedChoices: {}, domainPhases: initialPhases(),
       currentDomain: DOMAINS[0].id, completedDomains: [], domainContent: {},
-      messages: [], elaboration: "", schemaTables: DEFAULT_SCHEMA,
-      schemaConfirmed: false, helpIndex: 0, activeDomains: DOMAINS, projectName: "",
+      messages: [], elaboration: "", activeDomains: DOMAINS, projectName: "",
       isThinking: false, isStreaming: false, streamingText: "", isComplete: false,
       lastError: null, lastUserMessage: "", currentProvider: null, abortController: null,
       projectId: null, sessionLogger: null, messageCount: 0, tokenGetter: null,

@@ -17,8 +17,8 @@ export type DomainId =
   | "planning" | "architecture" | "database" | "api" | "environment"
   | "auth" | "testing" | "monitoring" | "frontend" | "deployment";
 
-export type DomainMode = "cards" | "open" | "schema";
-export type DomainPhase = "not_started" | "picking" | "generating" | "interviewing" | "complete";
+export type DomainMode = "cards" | "open";
+export type DomainPhase = "not_started" | "interviewing" | "complete";
 
 export interface ChoiceOption {
   id: string;
@@ -41,7 +41,6 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   showCards?: DomainId;
-  showSchema?: boolean;
   isComplete?: boolean;
   showDownload?: boolean;
 }

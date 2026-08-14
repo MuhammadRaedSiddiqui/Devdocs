@@ -39,7 +39,6 @@ export interface ChatMessage {
   role:         "user" | "assistant";
   content:      string;
   showCards?:   DomainId;
-  showSchema?:  boolean;
   isComplete?:  boolean;
   showDownload?: boolean;
 }
@@ -69,8 +68,9 @@ export interface InterviewData {
   domainContent:       Partial<Record<DomainId, string>>;
   conversationHistory: ChatMessage[];
   elaboration:         string;
-  schemaTables:        SchemaTables;
-  schemaConfirmed:     boolean;
+  // Deprecated — retained for backward compat reads, not written by new clients.
+  schemaTables?:       SchemaTables;
+  schemaConfirmed?:    boolean;
 }
 
 // ── AI provider types (shared between web settings UI and API key vault) ──────
