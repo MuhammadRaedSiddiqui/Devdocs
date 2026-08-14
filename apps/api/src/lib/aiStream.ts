@@ -20,17 +20,43 @@ export function streamAIResponse(
   userMessage:  string,
   config:       AIConfig,
   callbacks:    StreamCallbacks,
-  signal?:      AbortSignal
+  signal?:      AbortSignal,
+  history?:     { role: "user" | "assistant"; content: string }[],
 ): void {
+  const hist = (history ?? []).slice(-6);
   if (config.provider === "anthropic") {
-    streamAnthropic(systemPrompt, userMessage, config, callbacks, signal);
+    streamAnthropic(systemPrompt, userMessage, config, callbacks, signal, hist);
   } else if (config.provider === "bedrock") {
-    streamBedrock(systemPrompt, userMessage, config, callbacks, signal);
+    streamBedrock(systemPrompt, userMessage, config, callbacks, signal, hist);
   } else if (config.provider === "metamuse") {
-    streamMetaMuse(systemPrompt, userMessage, config, callbacks, signal);
+    streamMetaMuse(systemPrompt, userMessage, config, callbacks, signal, hist);
   } else {
-    streamOpenAI(systemPrompt, userMessage, config, callbacks, signal);
+    streamOpenAI(systemPrompt, userMessage, config, callbacks, signal, hist);
   }
+}
+
+function buildAnthropicMessages(
+  history: { role: "user" | "assistant"; content: string }[],
+  userMessage: string,
+): { role: "user" | "assistant"; content: string }[] {
+  const base = [...history];
+  // Dedupe if history already ends with this userMessage
+  if (base.length && base[base.length - 1].role === "user" && base[base.length - 1].content === userMessage) {
+    return base;
+  }
+  return [...base, { role: "user" as const, content: userMessage }];
+}
+
+function buildOpenAIMessages(
+  systemPrompt: string,
+  history: { role: "user" | "assistant"; content: string }[],
+  userMessage: string,
+): { role: "system" | "user" | "assistant"; content: string }[] {
+  const hist = [...history];
+  if (hist.length && hist[hist.length - 1].role === "user" && hist[hist.length - 1].content === userMessage) {
+    return [{ role: "system" as const, content: systemPrompt }, ...hist];
+  }
+  return [{ role: "system" as const, content: systemPrompt }, ...hist, { role: "user" as const, content: userMessage }];
 }
 
 async function streamAnthropic(
@@ -38,7 +64,8 @@ async function streamAnthropic(
   userMessage:  string,
   config:       AIConfig,
   callbacks:    StreamCallbacks,
-  signal?:      AbortSignal
+  signal?:      AbortSignal,
+  history:      { role: "user" | "assistant"; content: string }[] = [],
 ) {
   try {
     const Anthropic = (await import("@anthropic-ai/sdk")).default;
@@ -50,7 +77,7 @@ async function streamAnthropic(
         model:      config.model,
         max_tokens: 2000,
         system:     systemPrompt,
-        messages:   [{ role: "user", content: userMessage }],
+        messages:   buildAnthropicMessages(history, userMessage),
       },
       { signal }
     );
@@ -73,7 +100,8 @@ async function streamOpenAI(
   userMessage:  string,
   config:       AIConfig,
   callbacks:    StreamCallbacks,
-  signal?:      AbortSignal
+  signal?:      AbortSignal,
+  history:      { role: "user" | "assistant"; content: string }[] = [],
 ) {
   try {
     const OpenAI = (await import("openai")).default;
@@ -85,10 +113,7 @@ async function streamOpenAI(
         model:      config.model,
         max_tokens: 2000,
         stream:     true,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user",   content: userMessage  },
-        ],
+        messages: buildOpenAIMessages(systemPrompt, history, userMessage),
       },
       { signal }
     );
@@ -113,7 +138,8 @@ async function streamMetaMuse(
   userMessage:  string,
   config:       AIConfig,
   callbacks:    StreamCallbacks,
-  signal?:      AbortSignal
+  signal?:      AbortSignal,
+  history:      { role: "user" | "assistant"; content: string }[] = [],
 ) {
   try {
     const OpenAI = (await import("openai")).default;
@@ -128,10 +154,7 @@ async function streamMetaMuse(
         model:      config.model,
         max_tokens: 2000,
         stream:     true,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user",   content: userMessage  },
-        ],
+        messages: buildOpenAIMessages(systemPrompt, history, userMessage),
       },
       { signal }
     );
@@ -156,7 +179,8 @@ async function streamBedrock(
   userMessage:  string,
   config:       AIConfig,
   callbacks:    StreamCallbacks,
-  signal?:      AbortSignal
+  signal?:      AbortSignal,
+  history:      { role: "user" | "assistant"; content: string }[] = [],
 ) {
   try {
     const { AnthropicBedrock } = await import("@anthropic-ai/bedrock-sdk");
@@ -172,7 +196,7 @@ async function streamBedrock(
         model:      config.model,
         max_tokens: 2000,
         system:     systemPrompt,
-        messages:   [{ role: "user", content: userMessage }],
+        messages:   buildAnthropicMessages(history, userMessage),
       },
       { signal }
     );

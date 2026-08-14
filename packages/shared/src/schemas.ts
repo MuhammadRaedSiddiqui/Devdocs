@@ -30,6 +30,11 @@ export const StreamRequestSchema = z.object({
     lockedChoices: z.record(z.record(z.string())).default({}),
     elaboration: z.string().max(4000).default(""),
   }).optional(),
+  // Recent conversation history for multi-turn open domains (optional, max 12)
+  history: z.array(z.object({
+    role: z.enum(["user", "assistant"]),
+    content: z.string().max(4000),
+  })).max(12).optional(),
 });
 
 export type StreamRequest = z.infer<typeof StreamRequestSchema>;

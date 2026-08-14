@@ -34,7 +34,7 @@ app.use('*', requireClerkAuth);
 app.post('/stream', async (c) => {
   const parsed = StreamRequestSchema.safeParse(await c.req.json());
   if (!parsed.success) return c.json({ error: 'validation_error', fields: parsed.error.flatten().fieldErrors }, 400);
-  const { projectId, domainId, userMessage, provider } = parsed.data;
+  const { projectId, domainId, userMessage, provider, history } = parsed.data;
   const userId = c.get('userId');
   const project = await db.query.projects.findFirst({
     where: and(eq(projects.id, projectId), eq(projects.userId, userId)),
@@ -114,7 +114,7 @@ app.post('/stream', async (c) => {
           send({ type: 'done', text }); close();
         },
         onError: (errorType, message) => { clearTimeout(timeout); send({ type: 'error', errorType, message }); close(); },
-      }, abort.signal);
+      }, abort.signal, history);
     },
     cancel: () => abort.abort(),
   });

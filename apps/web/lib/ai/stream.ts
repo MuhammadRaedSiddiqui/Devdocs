@@ -15,6 +15,7 @@ export async function streamAIResponse(
   interview: InterviewSnapshot,
   callbacks: StreamCallbacks,
   signal?: AbortSignal,
+  history?: { role: "user" | "assistant"; content: string }[],
 ): Promise<void> {
   try {
     const token = await config.getToken();
@@ -26,6 +27,7 @@ export async function streamAIResponse(
         userMessage,
         provider: config.provider,
         interview,
+        history: history?.slice(-6),
       }),
     });
     if (!response.ok || !response.body) {
