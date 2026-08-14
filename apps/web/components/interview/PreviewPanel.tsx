@@ -68,78 +68,78 @@ export function PreviewPanel() {
   }
 
   return (
-    <div className="flex-shrink-0 border-l border-hairline bg-sidebar-mist flex flex-col overflow-hidden transition-[width,opacity] duration-300 max-md:!w-full max-md:!opacity-100 max-md:!border-l-0" style={{ width: store.isComplete ? 320 : 0, opacity: store.isComplete ? 1 : 0 }}>
-      {store.isComplete && (
-        <>
-          <div className="px-4 py-3 border-b border-hairline flex items-center gap-2 flex-shrink-0">
-            <span className="font-serif-heading text-[13px] text-ink flex-1">DOCUMENTATION.md</span>
-            <button
-              type="button"
-              onClick={() => setMode(mode === "preview" ? "edit" : "preview")}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border ${mode === "edit" ? "bg-ink text-white border-ink" : "bg-white text-ink-secondary border-hairline hover:bg-hover-veil"}`}
-            >
-              {mode === "edit" ? "Preview" : "Edit"}
-            </button>
-            <button type="button" onClick={handleDownloadMd} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-ink text-white text-[11px] font-medium">
-              ↓ .md
-            </button>
-            <button
-              type="button"
-              onClick={handleDownloadZip}
-              disabled={zipping}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-ink text-white text-[11px] font-medium disabled:opacity-50"
-            >
-              {zipping ? <span className="inline-block w-3 h-3 border-2 border-vellum border-t-transparent rounded-full animate-spin" /> : "↓ .zip"}
-            </button>
-          </div>
+    <div className="flex-shrink-0 border-l border-hairline bg-sidebar-mist flex flex-col overflow-hidden w-[320px] max-md:!w-full max-md:!border-l-0">
+      <div className="px-4 py-3 border-b border-hairline flex items-center gap-2 flex-shrink-0">
+        <span className="font-serif-heading text-[13px] text-ink flex-1">DOCUMENTATION.md</span>
+        <span className={`text-[10px] px-2 py-0.5 rounded-full border ${store.isComplete ? "bg-ink text-white border-ink" : "bg-white text-ink-faint border-hairline"}`}>{store.completedDomains.length}/{store.activeDomains.length}</span>
+        <button
+          type="button"
+          onClick={() => setMode(mode === "preview" ? "edit" : "preview")}
+          className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border ${mode === "edit" ? "bg-ink text-white border-ink" : "bg-white text-ink-secondary border-hairline hover:bg-hover-veil"}`}
+        >
+          {mode === "edit" ? "Preview" : "Edit"}
+        </button>
+        <button type="button" onClick={handleDownloadMd} disabled={!store.isComplete} title={store.isComplete ? "Download markdown" : "Complete interview to download"} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-ink text-white text-[11px] font-medium disabled:opacity-40 disabled:cursor-not-allowed">
+          ↓ .md
+        </button>
+        <button
+          type="button"
+          onClick={handleDownloadZip}
+          disabled={zipping || !store.isComplete}
+          title={store.isComplete ? "Download zip" : "Complete interview to download"}
+          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-ink text-white text-[11px] font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {zipping ? <span className="inline-block w-3 h-3 border-2 border-vellum border-t-transparent rounded-full animate-spin" /> : "↓ .zip"}
+        </button>
+      </div>
 
-          {mode === "edit" ? (
-            <textarea
-              value={editText}
-              onChange={e => handleEditChange(e.target.value)}
-              className="flex-1 w-full p-3.5 bg-white border-none text-ink font-mono text-xs leading-relaxed resize-none"
-              spellCheck={false}
-            />
-          ) : (
-            <div className="flex-1 overflow-y-auto p-3.5">
-              {(() => {
-                const { header, sections } = parseDocumentSections(fullDoc);
-                const activeDomains = store.activeDomains;
-                return (
-                  <>
-                    <MarkdownRenderer content={header} size="sm" />
-                    {sections.map((section, i) => {
-                      const domainId = i < activeDomains.length ? activeDomains[i].id : null;
-                      if (regenerating === domainId) {
-                        return (
-                          <div key={i} className="flex items-center justify-center py-6 text-ink-faint text-[11px]">
-                            <span className="inline-block w-3 h-3 border-2 border-ink-faint border-t-transparent rounded-full animate-spin mr-2" />
-                            Regenerating...
-                          </div>
-                        );
-                      }
-                      return (
-                        <div key={i} className="relative group">
-                          <MarkdownRenderer content={section} size="sm" />
-                          {domainId && (
-                            <button
-                              type="button"
-                              onClick={() => handleRegenerate(domainId)}
-                              className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity px-2 py-0.5 rounded-md text-[10px] text-ink-muted border border-vellum-border bg-white hover:text-ink hover:border-ink/30"
-                            >
-                              ↻ Regenerate
-                            </button>
-                          )}
-                          {i < sections.length - 1 && <hr className="border-vellum-border-light my-3" />}
-                        </div>
-                      );
-                    })}
-                  </>
-                );
-              })()}
-            </div>
-          )}
-        </>
+      {mode === "edit" ? (
+        <textarea
+          value={editText}
+          onChange={e => handleEditChange(e.target.value)}
+          className="flex-1 w-full p-3.5 bg-white border-none text-ink font-mono text-xs leading-relaxed resize-none"
+          spellCheck={false}
+        />
+      ) : (
+        <div className="flex-1 overflow-y-auto p-3.5">
+          {(() => {
+            const { header, sections } = parseDocumentSections(fullDoc);
+            const activeDomains = store.activeDomains;
+            return (
+              <>
+                <MarkdownRenderer content={header} size="sm" />
+                {sections.map((section, i) => {
+                  const domainId = i < activeDomains.length ? activeDomains[i].id : null;
+                  const isDone = domainId ? store.completedDomains.includes(domainId) : true;
+                  if (regenerating === domainId) {
+                    return (
+                      <div key={i} className="flex items-center justify-center py-6 text-ink-faint text-[11px]">
+                        <span className="inline-block w-3 h-3 border-2 border-ink-faint border-t-transparent rounded-full animate-spin mr-2" />
+                        Regenerating...
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={i} className={`relative group ${!isDone ? "opacity-60" : ""}`}>
+                      <MarkdownRenderer content={section} size="sm" />
+                      {!isDone && domainId && <div className="text-[10px] text-ink-faint mt-1">Not yet generated — will appear after {activeDomains.find(d=>d.id===domainId)?.label}</div>}
+                      {domainId && isDone && (
+                        <button
+                          type="button"
+                          onClick={() => handleRegenerate(domainId)}
+                          className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity px-2 py-0.5 rounded-md text-[10px] text-ink-muted border border-vellum-border bg-white hover:text-ink hover:border-ink/30"
+                        >
+                          ↻ Regenerate
+                        </button>
+                      )}
+                      {i < sections.length - 1 && <hr className="border-vellum-border-light my-3" />}
+                    </div>
+                  );
+                })}
+              </>
+            );
+          })()}
+        </div>
       )}
     </div>
   );

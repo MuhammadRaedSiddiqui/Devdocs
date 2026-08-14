@@ -165,13 +165,13 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
   }
 
   if (projectQuery.error || !projectQuery.data) {
-    return <div className="min-h-screen grid place-items-center text-sm text-danger">Unable to load this project.</div>;
+    return <div className="min-h-[100dvh] grid place-items-center text-sm text-danger">Unable to load this project.</div>;
   }
 
   const projectType = projectQuery.data.type as ProjectType;
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
+    <div className="flex flex-col h-[100dvh] overflow-hidden">
       <header className="h-[52px] border-b border-hairline bg-sidebar-mist flex items-center px-4 md:px-7 gap-2.5 flex-shrink-0">
         <span className="font-medium text-[14px] text-ink">DevDocs</span>
         <span className="text-[13px] text-ink-muted hidden sm:inline">{projectQuery.data.name}</span>
@@ -194,14 +194,14 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
       ) : (
         <>
           {/* Desktop: three-panel layout */}
-          <div className="hidden md:flex flex-row h-[calc(100vh-52px)] overflow-hidden">
+          <div className="hidden md:flex flex-row h-[calc(100dvh-52px)] overflow-hidden">
             <DomainProgress onRevisit={(id) => { const label = store.activeDomains.find(d=>d.id===id)?.label ?? id; toast(`Rewound to ${label}`, "info"); }} />
             <ChatPanel />
             <PreviewPanel />
           </div>
 
           {/* Mobile: chat only + bottom nav */}
-          <div className="flex md:hidden flex-col h-[calc(100vh-52px-56px)] overflow-hidden">
+          <div className="flex md:hidden flex-col h-[calc(100dvh-52px-56px)] overflow-hidden">
             <ChatPanel />
           </div>
 
@@ -217,30 +217,26 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
               </svg>
               <span className="text-[10px]">Domains</span>
             </button>
-            {store.isComplete && (
-              <button
-                type="button"
-                onClick={() => setPreviewSheet(true)}
-                className="flex flex-col items-center gap-0.5 text-ink-muted"
-              >
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-ink-muted">
+            <button
+              type="button"
+              onClick={() => setPreviewSheet(true)}
+              className="flex flex-col items-center gap-0.5 text-ink-muted"
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-ink-muted">
                   <path d="M4 3h8l4 4v10a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   <path d="M12 3v4h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                <span className="text-[10px]">Document</span>
-              </button>
-            )}
+              <span className="text-[10px]">Document {store.completedDomains.length}/{store.activeDomains.length}</span>
+            </button>
           </div>
 
           {/* Bottom sheets for mobile */}
           <BottomSheet open={domainsSheet} onClose={() => setDomainsSheet(false)} title="Interview Progress">
             <DomainProgress onRevisit={(id) => { setDomainsSheet(false); const label = store.activeDomains.find(d=>d.id===id)?.label ?? id; toast(`Rewound to ${label}`, "info"); }} />
           </BottomSheet>
-          {store.isComplete && (
-            <BottomSheet open={previewSheet} onClose={() => setPreviewSheet(false)} title="DOCUMENTATION.md">
-              <PreviewPanel />
-            </BottomSheet>
-          )}
+          <BottomSheet open={previewSheet} onClose={() => setPreviewSheet(false)} title="DOCUMENTATION.md">
+            <PreviewPanel />
+          </BottomSheet>
         </>
       )}
     </div>

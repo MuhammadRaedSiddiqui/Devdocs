@@ -13,7 +13,7 @@ export function DomainPicker({ domain, context, lockedValue, onConfirm }: Props)
   const isLocked = lockedValue !== null;
   return (
     <div className="mt-2.5 bg-vellum border border-vellum-border rounded-lg overflow-hidden">
-      <div className="grid grid-cols-2 gap-2 p-3">
+      <div role="radiogroup" aria-label={`${domain} choices`} className="grid grid-cols-2 gap-2 p-3">
         {choices.map(opt => (
           <ChoiceCard key={opt.id} domain={domain} option={opt} selected={lockedValue===opt.id} context={context} onSelect={isLocked?()=>{}:(id)=>onConfirm(id)} />
         ))}

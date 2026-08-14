@@ -1,6 +1,6 @@
 export function InterviewSkeleton() {
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
+    <div className="flex flex-col h-[100dvh] overflow-hidden">
       {/* Header skeleton */}
       <header className="h-[52px] border-b border-vellum-border bg-vellum flex items-center px-4 md:px-7 gap-2.5 flex-shrink-0">
         <span className="font-serif-heading text-[17px] text-ink">DevDocs AI</span>
@@ -11,7 +11,7 @@ export function InterviewSkeleton() {
       </header>
 
       {/* Three-panel skeleton */}
-      <div className="flex flex-row h-[calc(100vh-52px)] overflow-hidden">
+      <div className="flex flex-row h-[calc(100dvh-52px)] overflow-hidden">
         {/* Left sidebar */}
         <aside className="w-[200px] flex-shrink-0 border-r border-vellum-border bg-vellum flex flex-col overflow-hidden hidden md:flex">
           <div className="px-4 pt-3.5 pb-2">
