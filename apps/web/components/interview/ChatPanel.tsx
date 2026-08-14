@@ -73,19 +73,21 @@ function Bubble({message,context,onConfirmCard}:{message:ChatMessage;context:Pro
   return (
     <div className={`flex gap-2.5 items-start ${isUser?"flex-row-reverse":""}`}>
       <Avatar role={message.role}/>
-      <div className={`relative group max-w-[80%] px-3.5 py-2.5 rounded-lg text-sm leading-relaxed border ${isUser?"bg-sidebar-mist text-ink border-hairline":"bg-white text-ink-secondary border-hairline"}`}>
-        <button type="button" onClick={handleCopy} aria-label="Copy message" className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity px-1.5 py-0.5 rounded text-[10px] bg-white border border-hairline text-ink-muted hover:text-ink">⧉ Copy</button>
-        <MarkdownRenderer content={message.content} size="md" />
-        {message.showCards && <DomainPicker domain={message.showCards} context={context} lockedValue={store.lockedChoices[message.showCards]?.[getDomain(message.showCards).requiredChoiceKey??""]??null} onConfirm={onConfirmCard}/>}
-        {message.showDownload && (
-          <div className="mt-3 flex flex-col gap-1.5">
-            <button type="button" onClick={handleDownload} className="inline-flex items-center gap-1.5 px-4 py-2 bg-ink text-vellum rounded-vellum text-xs font-medium">↓ Download DOCUMENTATION.md</button>
-            <button type="button" onClick={handleDownloadZip} disabled={zipping} className="inline-flex items-center gap-1.5 text-[11px] text-ink-muted hover:text-ink disabled:opacity-50">
-              {zipping ? <span className="inline-block w-3 h-3 border-2 border-ink-faint border-t-transparent rounded-full animate-spin"/> : null}
-              {zipping ? "Packaging..." : "or download as .zip"}
-            </button>
-          </div>
-        )}
+      <div className={`flex flex-col gap-1 max-w-[80%] ${isUser?"items-end":"items-start"}`}>
+        <div className={`px-3.5 py-2.5 rounded-lg text-sm leading-relaxed border ${isUser?"bg-sidebar-mist text-ink border-hairline":"bg-white text-ink-secondary border-hairline"}`}>
+          <MarkdownRenderer content={message.content} size="md" />
+          {message.showCards && <DomainPicker domain={message.showCards} context={context} lockedValue={store.lockedChoices[message.showCards]?.[getDomain(message.showCards).requiredChoiceKey??""]??null} onConfirm={onConfirmCard}/>}
+          {message.showDownload && (
+            <div className="mt-3 flex flex-col gap-1.5">
+              <button type="button" onClick={handleDownload} className="inline-flex items-center gap-1.5 px-4 py-2 bg-ink text-vellum rounded-vellum text-xs font-medium">↓ Download DOCUMENTATION.md</button>
+              <button type="button" onClick={handleDownloadZip} disabled={zipping} className="inline-flex items-center gap-1.5 text-[11px] text-ink-muted hover:text-ink disabled:opacity-50">
+                {zipping ? <span className="inline-block w-3 h-3 border-2 border-ink-faint border-t-transparent rounded-full animate-spin"/> : null}
+                {zipping ? "Packaging..." : "or download as .zip"}
+              </button>
+            </div>
+          )}
+        </div>
+        <button type="button" onClick={handleCopy} aria-label="Copy message" className="px-1 text-[11px] text-ink-faint hover:text-ink transition-colors">⧉ Copy</button>
       </div>
     </div>
   );
