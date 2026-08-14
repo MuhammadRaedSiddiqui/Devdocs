@@ -2,6 +2,10 @@
 import { useInterviewStore } from "@/lib/interview/store";
 export function DomainProgress() {
   const { completedDomains, currentDomain, isComplete, activeDomains } = useInterviewStore();
+  const goBackToDomain = useInterviewStore(s => s.goBackToDomain);
+  const isThinking = useInterviewStore(s => s.isThinking);
+  const isStreaming = useInterviewStore(s => s.isStreaming);
+  const busy = isThinking || isStreaming;
   const pct = Math.round(completedDomains.length/activeDomains.length*100);
   return (
     <aside className="w-full md:w-[260px] flex-shrink-0 md:border-r border-hairline bg-sidebar-mist flex flex-col overflow-hidden">
@@ -10,10 +14,20 @@ export function DomainProgress() {
       <div className="flex-1 overflow-y-auto">
         {activeDomains.map((d)=>{
           const done=completedDomains.includes(d.id), active=d.id===currentDomain&&!isComplete;
-          return (
-            <div key={d.id} className={`flex items-center gap-2 px-4 py-2 transition-colors ${active?"bg-hover-veil":""}`}>
+          const canGoBack = done && !busy;
+          const row = (
+            <>
               <div className={`w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center text-[9px] ${done?"bg-ink text-vellum":active?"border-[1.5px] border-[var(--accent)]":"border-[1.5px] border-vellum-border"}`}>{done&&"✓"}</div>
               <div className={`text-[14px] ${done?"text-ink-muted":active?"text-ink font-medium":"text-ink-faint"}`}>{d.label}</div>
+            </>
+          );
+          return canGoBack ? (
+            <button key={d.id} type="button" onClick={()=>goBackToDomain(d.id)} aria-label={`Revisit ${d.label}`} className="w-full flex items-center gap-2 px-4 py-2 transition-colors hover:bg-hover-veil text-left">
+              {row}
+            </button>
+          ) : (
+            <div key={d.id} aria-current={active ? "step" : undefined} className={`flex items-center gap-2 px-4 py-2 transition-colors ${active?"bg-hover-veil":""}`}>
+              {row}
             </div>
           );
         })}

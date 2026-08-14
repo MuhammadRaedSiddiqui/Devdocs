@@ -9,6 +9,7 @@ import { CARD_CHOICES } from "@/lib/interview/choices";
 import { DomainPicker } from "@/components/interview/DomainPicker";
 import { ErrorBanner } from "@/components/interview/ErrorBanner";
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
+import { useToast } from "@/lib/toast";
 
 function mdLite(t: string) {
   // Minimal streaming markdown: escape HTML then allow **bold** and `code`.
@@ -48,8 +49,12 @@ function labelFor(domainId: DomainId, choiceId: string) {
 
 function Bubble({message,context,onConfirmCard}:{message:ChatMessage;context:ProjectContext;onConfirmCard:(id:string)=>void}) {
   const store = useInterviewStore();
+  const { toast } = useToast();
   const [zipping, setZipping] = useState(false);
   const isUser = message.role==="user";
+  function handleCopy() {
+    navigator.clipboard.writeText(message.content).then(()=>toast("Copied to clipboard", "success")).catch(()=>toast("Copy failed", "error"));
+  }
   function handleDownload() {
     const doc=selectFullDocument(store); const blob=new Blob([doc],{type:"text/markdown"}); const url=URL.createObjectURL(blob);
     const a=document.createElement("a"); a.href=url; a.download="DOCUMENTATION.md"; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
@@ -68,7 +73,8 @@ function Bubble({message,context,onConfirmCard}:{message:ChatMessage;context:Pro
   return (
     <div className={`flex gap-2.5 items-start ${isUser?"flex-row-reverse":""}`}>
       <Avatar role={message.role}/>
-      <div className={`max-w-[80%] px-3.5 py-2.5 rounded-lg text-sm leading-relaxed border ${isUser?"bg-sidebar-mist text-ink border-hairline":"bg-white text-ink-secondary border-hairline"}`}>
+      <div className={`relative group max-w-[80%] px-3.5 py-2.5 rounded-lg text-sm leading-relaxed border ${isUser?"bg-sidebar-mist text-ink border-hairline":"bg-white text-ink-secondary border-hairline"}`}>
+        <button type="button" onClick={handleCopy} aria-label="Copy message" className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity px-1.5 py-0.5 rounded text-[10px] bg-white border border-hairline text-ink-muted hover:text-ink">⧉ Copy</button>
         <MarkdownRenderer content={message.content} size="md" />
         {message.showCards && <DomainPicker domain={message.showCards} context={context} lockedValue={store.lockedChoices[message.showCards]?.[getDomain(message.showCards).requiredChoiceKey??""]??null} onConfirm={onConfirmCard}/>}
         {message.showDownload && (

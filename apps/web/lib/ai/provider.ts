@@ -20,8 +20,24 @@ export function setAISession(projectId: string, getToken: () => Promise<string |
   session = { projectId, getToken };
 }
 
+export function setActiveProvider(provider: AIProvider) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(ACTIVE_PROVIDER_KEY, provider);
+    if (session?.projectId) {
+      localStorage.setItem(`${ACTIVE_PROVIDER_KEY}:${session.projectId}`, provider);
+    }
+  } catch {}
+}
+
 export function getActiveConfig(): AIProviderConfig | null {
   if (typeof window === 'undefined' || !session) return null;
-  const provider = (localStorage.getItem(ACTIVE_PROVIDER_KEY) ?? 'anthropic') as AIProvider;
+  let provider: AIProvider | null = null;
+  try {
+    provider = (localStorage.getItem(`${ACTIVE_PROVIDER_KEY}:${session.projectId}`) ??
+                localStorage.getItem(ACTIVE_PROVIDER_KEY) ?? 'anthropic') as AIProvider;
+  } catch {
+    provider = 'anthropic';
+  }
   return { provider, ...session };
 }

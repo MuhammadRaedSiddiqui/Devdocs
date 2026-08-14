@@ -5,7 +5,7 @@ import { create } from "zustand";
 import type { ChatMessage, DomainDefinition, DomainId, DomainPhase, ProjectContext } from "@/lib/types";
 import { DOMAINS, getActiveDomains, getOpener, buildFullDocument, nextDomainId } from "@/lib/interview/domains";
 import { CARD_CHOICES } from "@/lib/interview/choices";
-import { getActiveConfig, type AIProvider } from "@/lib/ai/provider";
+import { getActiveConfig, setActiveProvider, type AIProvider } from "@/lib/ai/provider";
 import { streamAIResponse, type StreamErrorType } from "@/lib/ai/stream";
 import { SessionLogger } from "@/lib/session/logger";
 import type { MessageMetadata } from "@devdocs/shared";
@@ -77,6 +77,7 @@ interface InterviewState {
   clearError:        () => void;
   retryLast:         () => void;
   replayOpenerForCurrentDomain: () => void;
+  goBackToDomain:    (domainId: DomainId) => void;
   resumeFromSaved:   (data: {
     lockedContext:       ProjectContext;
     lockedChoices:       Partial<Record<DomainId, Record<string, string>>>;
@@ -332,7 +333,10 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
 
   setProjectName: (name) => set({ projectName: name }),
   setProjectId: (id) => set({ projectId: id }),
-  setProvider: (p) => set({ currentProvider: p }),
+  setProvider: (p) => {
+    set({ currentProvider: p });
+    setActiveProvider(p);
+  },
 
   setTokenGetter: (getter) => set({ tokenGetter: getter }),
 
@@ -540,6 +544,33 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
       messages: [...state.messages, { role: "assistant" as const, content: opener, ...opts }],
       messageCount: state.messageCount + 1,
     }));
+  },
+
+  goBackToDomain: (domainId) => {
+    const s = get();
+    if (s.isThinking || s.isStreaming) return;
+    if (!s.completedDomains.includes(domainId)) return;
+    // Remove domain and any domains after it from completed (linear flow)
+    const activeIds = s.activeDomains.map(d => d.id);
+    const targetIdx = activeIds.indexOf(domainId);
+    if (targetIdx === -1) return;
+    const toRemove = new Set(activeIds.slice(targetIdx));
+    set(state => ({
+      currentDomain: domainId,
+      completedDomains: state.completedDomains.filter(id => !toRemove.has(id)),
+      isComplete: false,
+      domainPhases: Object.fromEntries(
+        DOMAINS.map(d => [
+          d.id,
+          state.completedDomains.includes(d.id) && !toRemove.has(d.id) ? "complete"
+          : d.id === domainId ? "interviewing"
+          : "not_started",
+        ])
+      ) as Record<DomainId, DomainPhase>,
+    }));
+    // Clear any locked choice for this domain so user can re-pick? Keep for now — user can overwrite.
+    // Re-emit opener for the domain if no picker already present
+    get().replayOpenerForCurrentDomain();
   },
 
   resumeFromSaved: (data) => {
