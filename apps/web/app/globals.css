@@ -45,6 +45,7 @@
   --ink-muted: var(--color-mid-ash);
   --ink-faint: var(--color-hollow);
   --terracotta: var(--color-graphite-ink);
+  --accent: #d97757;
   /* Destructive tokens retain semantic red for a11y — monochrome elsewhere. */
   --danger: #c0392b;
   --danger-bg: #fdf2f2;

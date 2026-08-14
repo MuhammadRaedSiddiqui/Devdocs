@@ -41,15 +41,15 @@ export function getOpener(domainId: DomainId, ctx: ProjectContext, elaboration: 
   const typeLabel = PROJECT_TYPE_LABELS[ctx.projectType];
   switch (domainId) {
     case "planning":
-      return `I've got your setup: ${typeLabel}, ${fmtTeam(ctx)} team, ${fmtTimeline(ctx)} timeline, ${ctx.budget} budget.\n\nNow tell me about the project itself — what does it do, who is it for, and what's the core thing a user does in it? The more detail you give me here, the more specific I can be in every domain that follows.`;
+      return `I've got your setup: ${typeLabel}, ${fmtTeam(ctx)} team, ${fmtTimeline(ctx)} timeline, ${ctx.budget} budget.\n\nNow tell me about the project itself — what does it do, who is it for, and what's the core thing a user does in it? The more detail you give me here, the more specific I can be in every domain that follows.\n\nExample: "A habit tracker for remote teams — users create habits, check in daily, and see streaks on a dashboard."`;
     case "architecture": return "Now let's pick your architecture pattern.";
     case "database":     return "Choose where your app's information will live. I'll handle the technical setup details in your documentation.";
-    case "api":          return "Database choice saved. List the main actions your app needs — things like 'users sign up', 'users create a project'. I'll convert these into endpoints.";
+    case "api":          return `Database choice saved. List the main actions your app needs — things like 'users sign up', 'users create a project', 'users invite teammates'. I'll convert these into endpoints.\n\nExample: "users sign up, users create board, users invite teammate, users move card"`;
     case "environment":  return "Let's lock in your environment strategy.";
     case "auth":         return "Now authentication. Which provider fits your stack?";
     case "testing":      return "Testing strategy next.";
     case "monitoring":   return "Monitoring setup.";
-    case "frontend":     return `Almost done. ${elaboration ? "Given what you described earlier, " : ""}describe your key screens in one sentence each — start with what a new user sees first.`;
+    case "frontend":     return `Almost done. ${elaboration ? "Given what you described earlier, " : ""}describe your key screens in one sentence each — start with what a new user sees first.\n\nExample: "Login → Dashboard with habit list → Habit detail with calendar → Settings"`;
     case "deployment":   return "Last one. Where are you deploying?";
   }
 }

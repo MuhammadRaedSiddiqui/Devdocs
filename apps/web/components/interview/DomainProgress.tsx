@@ -12,7 +12,7 @@ export function DomainProgress() {
           const done=completedDomains.includes(d.id), active=d.id===currentDomain&&!isComplete;
           return (
             <div key={d.id} className={`flex items-center gap-2 px-4 py-2 transition-colors ${active?"bg-hover-veil":""}`}>
-              <div className={`w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center text-[9px] ${done?"bg-ink text-vellum":active?"border-[1.5px] border-terracotta":"border-[1.5px] border-vellum-border"}`}>{done&&"✓"}</div>
+              <div className={`w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center text-[9px] ${done?"bg-ink text-vellum":active?"border-[1.5px] border-[var(--accent)]":"border-[1.5px] border-vellum-border"}`}>{done&&"✓"}</div>
               <div className={`text-[14px] ${done?"text-ink-muted":active?"text-ink font-medium":"text-ink-faint"}`}>{d.label}</div>
             </div>
           );

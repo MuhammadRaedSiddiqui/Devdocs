@@ -400,8 +400,24 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
     set(s => ({
       lockedChoices: { ...s.lockedChoices, [domain]: { ...(s.lockedChoices[domain] ?? {}), [key]: value } },
     }));
-    const label = CARD_CHOICES[domain]?.find(o => o.id === value)?.label ?? value;
     const domainLabel = DOMAINS.find(d => d.id === domain)!.label;
+    let label: string;
+    if (value === "skipped") {
+      label = "Skipped — deferred to v2";
+      // For skipped, generate deferred doc locally without AI call
+      const deferred = `## ${domainLabel}\n\n**Status:** Deferred to v2 — not applicable for this project.\n\nSkipped during interview. Revisit when scope expands.`;
+      completeDomain(set, get, domain, deferred);
+      const state = get();
+      if (state.sessionLogger) {
+        state.sessionLogger.logUserMessage(`Skipped: ${domainLabel}`, domain, { cardChoices: { [key]: value } });
+      }
+      set(s => ({ messages: [...s.messages, { role: "user" as const, content: `Skipped: ${domainLabel}` }], messageCount: s.messageCount + 1 }));
+      return;
+    } else if (value.startsWith("custom:")) {
+      label = value.slice(7);
+    } else {
+      label = CARD_CHOICES[domain]?.find(o => o.id === value)?.label ?? value;
+    }
 
     // Log card selection metadata
     const metadata: MessageMetadata = {
@@ -428,6 +444,13 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
     if (!text.trim() || get().isThinking || get().isStreaming) return;
     const domain = get().currentDomain;
     const d      = DOMAINS.find(x => x.id === domain)!;
+
+    // Validation: planning elaboration should be meaningful (≥10 chars, ideally 20)
+    if (domain === "planning" && text.trim().length < 10) {
+      const hint = "Could you share a bit more detail? Even one sentence about who it's for and what a user does helps me tailor the rest.";
+      set(s => ({ messages: [...s.messages, { role: "assistant" as const, content: hint }], messageCount: s.messageCount + 1 }));
+      return;
+    }
 
     // Log user message to session
     const state = get();

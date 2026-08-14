@@ -41,6 +41,8 @@ function Chip({text}:{text:string}) {
   return <span className="bg-white border border-vellum-border rounded-md px-2 py-0.5 text-[11px] text-ink-secondary">{text}</span>;
 }
 function labelFor(domainId: DomainId, choiceId: string) {
+  if (choiceId === "skipped") return "Skipped";
+  if (choiceId.startsWith("custom:")) return choiceId.slice(7);
   return CARD_CHOICES[domainId]?.find(o=>o.id===choiceId)?.label ?? choiceId;
 }
 
@@ -94,6 +96,12 @@ export function ChatPanel() {
   function handleSend() { if(!input.trim()) return; store.sendMessage(input); setInput(""); }
   function handleConfirmCard(choiceId: string) { if(!domain.requiredChoiceKey) return; store.lockDomainChoice(domain.id,domain.requiredChoiceKey,choiceId); }
   const disabled = store.isThinking||store.isStreaming;
+  const openExamples: Partial<Record<DomainId, string[]>> = {
+    planning: ["Habit tracker for remote teams — users create habits, check in daily, see streaks", "Marketplace for local tutors — students book sessions, tutors manage availability"],
+    api: ["users sign up, users create project, users invite teammate", "users create board, users move card, users comment"],
+    frontend: ["Login → Dashboard with habit list → Habit detail → Settings", "Landing → Pricing → Checkout → Success"],
+  };
+  const examples = !store.isComplete && domain.mode === "open" ? openExamples[domain.id] : null;
   return (
     <div className="flex-1 flex flex-col overflow-hidden min-w-0 bg-white">
       {/* Context bar */}
@@ -121,9 +129,19 @@ export function ChatPanel() {
         )}
       </div>
       {/* Input */}
-      <div className="border-t border-hairline px-5 py-3.5 flex gap-2 items-end flex-shrink-0 bg-white">
-        <textarea value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if((e.metaKey||e.ctrlKey)&&e.key==="Enter")handleSend();}} disabled={disabled} rows={1} placeholder={disabled?"AI is responding...":store.isComplete?"Ask a question or request a change...":"Type your answer..."} className="flex-1 px-3.5 py-2.5 border border-hairline rounded-lg text-[14px] bg-white text-ink resize-none min-h-[42px] max-h-[88px] disabled:opacity-45"/>
-        <button type="button" onClick={handleSend} disabled={disabled} className="px-4 py-2.5 bg-ink text-white rounded-lg text-[14px] font-medium disabled:opacity-35">Send</button>
+      <div className="border-t border-hairline px-5 py-3.5 flex flex-col gap-2 flex-shrink-0 bg-white">
+        {examples && (
+          <div className="flex gap-1.5 flex-wrap">
+            <span className="text-[11px] text-ink-faint py-1">Try:</span>
+            {examples.map(ex => (
+              <button key={ex} type="button" onClick={()=>setInput(ex)} className="px-2.5 py-1 border border-hairline rounded-full text-[11px] text-ink-muted bg-sidebar-mist hover:bg-hover-veil truncate max-w-[260px]">{ex.slice(0,48)}…</button>
+            ))}
+          </div>
+        )}
+        <div className="flex gap-2 items-end">
+          <textarea value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if((e.metaKey||e.ctrlKey)&&e.key==="Enter")handleSend();}} disabled={disabled} rows={1} placeholder={disabled?"AI is responding...":store.isComplete?"Ask a question or request a change...":"Type your answer..."} className="flex-1 px-3.5 py-2.5 border border-hairline rounded-lg text-[14px] bg-white text-ink resize-none min-h-[42px] max-h-[88px] disabled:opacity-45"/>
+          <button type="button" onClick={handleSend} disabled={disabled} className="px-4 py-2.5 bg-ink text-white rounded-lg text-[14px] font-medium disabled:opacity-35">Send</button>
+        </div>
       </div>
     </div>
   );

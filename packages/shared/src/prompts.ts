@@ -120,7 +120,13 @@ function buildChoicesSummary(
   for (const [domainId, choices] of Object.entries(lockedChoices)) {
     const label = DOMAIN_LABELS[domainId as DomainId] ?? domainId;
     for (const [, value] of Object.entries(choices ?? {})) {
-      lines.push(`- ${label}: **${value}**`);
+      if (value === "skipped") {
+        lines.push(`- ${label}: **Skipped — deferred to v2**`);
+      } else if (value.startsWith("custom:")) {
+        lines.push(`- ${label}: **Custom — ${value.slice(7)}**`);
+      } else {
+        lines.push(`- ${label}: **${value}**`);
+      }
     }
   }
   return lines.join("\n");
