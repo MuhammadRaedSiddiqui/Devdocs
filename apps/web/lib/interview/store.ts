@@ -9,6 +9,7 @@ import { getActiveConfig, setActiveProvider, type AIProvider } from "@/lib/ai/pr
 import { streamAIResponse, type StreamErrorType } from "@/lib/ai/stream";
 import { SessionLogger } from "@/lib/session/logger";
 import type { MessageMetadata } from "@devdocs/shared";
+import { analytics } from "@/lib/analytics";
 
 // Error messages shown in the chat when a stream fails
 const ERROR_MESSAGES: Record<StreamErrorType, string> = {
@@ -61,6 +62,8 @@ interface InterviewState {
   sessionLogger:    SessionLogger | null;
   messageCount:     number;
   tokenGetter:      (() => Promise<string | null>) | null;
+  interviewStartAt: number | null;
+  domainStartAt:    number | null;
 
   // Actions
   setProjectName:    (name: string) => void;
@@ -261,6 +264,8 @@ function runOpener(set: SetFn, get: GetFn, domainId: DomainId) {
 }
 
 function completeDomain(set: SetFn, get: GetFn, domainId: DomainId, content: string) {
+  const start = get().domainStartAt;
+  const duration = start ? Date.now() - start : 0;
   set(s => ({
     domainContent:    { ...s.domainContent, [domainId]: content },
     completedDomains: s.completedDomains.includes(domainId)
@@ -269,6 +274,15 @@ function completeDomain(set: SetFn, get: GetFn, domainId: DomainId, content: str
     domainPhases:     { ...s.domainPhases, [domainId]: "complete" },
   }));
   persistToSupabase({ domainContent: get().domainContent });
+
+  // Analytics: time per domain
+  if (duration > 0) {
+    try {
+      const pid = get().projectId ?? "unknown";
+      const provider = get().currentProvider ?? "";
+      analytics.domainCompletedWithTiming(pid, domainId, duration, provider, "");
+    } catch {}
+  }
 
   // Update session with completed domain count
   const state = get();
@@ -284,6 +298,12 @@ function completeDomain(set: SetFn, get: GetFn, domainId: DomainId, content: str
   const next = nextDomainId(domainId, active);
   if (!next) {
     set({ isComplete: true });
+    // Analytics: interview completed
+    try {
+      const pid = get().projectId ?? "unknown";
+      const totalMs = get().interviewStartAt ? Date.now() - get().interviewStartAt! : 0;
+      analytics.interviewCompleted(pid, get().completedDomains.length, totalMs, "");
+    } catch {}
 
     runReply(
       set, get,
@@ -303,7 +323,7 @@ function completeDomain(set: SetFn, get: GetFn, domainId: DomainId, content: str
     );
     return;
   }
-  set({ currentDomain: next });
+  set({ currentDomain: next, domainStartAt: Date.now() });
   runOpener(set, get, next);
 }
 
@@ -331,6 +351,8 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
   sessionLogger:    null,
   messageCount:     0,
   tokenGetter:      null,
+  interviewStartAt: null,
+  domainStartAt:    null,
 
   setProjectName: (name) => set({ projectName: name }),
   setProjectId: (id) => set({ projectId: id }),
@@ -383,12 +405,20 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
 
   setLockedContext: (ctx) => {
     const active = getActiveDomains(ctx.projectType);
+    const now = Date.now();
     set(s => ({
       lockedContext: ctx,
       activeDomains: active,
       currentDomain: active[0].id,
       domainPhases: { ...s.domainPhases, [active[0].id]: "interviewing" },
+      interviewStartAt: now,
+      domainStartAt: now,
     }));
+    // Analytics: interview started
+    try {
+      const pid = get().projectId ?? "unknown";
+      analytics.interviewStarted(pid, "");
+    } catch {}
 
     void (async () => {
       const state = get();
@@ -585,6 +615,7 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
         lockedChoices: nextChoices,
         messages: nextMessages,
         isComplete: false,
+        domainStartAt: Date.now(),
         domainPhases: Object.fromEntries(
           DOMAINS.map(d => [
             d.id,
@@ -610,6 +641,7 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
         const { showSchema: _ignored, ...rest } = message as ChatMessage & { showSchema?: boolean };
         return rest as ChatMessage;
       });
+    const isComplete = nextIdx === -1;
     set({
       lockedContext:    data.lockedContext,
       lockedChoices:    data.lockedChoices,
@@ -619,7 +651,9 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
       elaboration:      data.elaboration,
       activeDomains:    active,
       currentDomain:    nextIdx === -1 ? active[active.length - 1].id : active[nextIdx].id,
-      isComplete:       nextIdx === -1,
+      isComplete,
+      domainStartAt:    isComplete ? null : Date.now(),
+      interviewStartAt: isComplete ? null : Date.now(),
       domainPhases: Object.fromEntries(
         DOMAINS.map(d => [
           d.id,
@@ -641,6 +675,7 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
       isThinking: false, isStreaming: false, streamingText: "", isComplete: false,
       lastError: null, lastUserMessage: "", currentProvider: null, abortController: null,
       projectId: null, sessionLogger: null, messageCount: 0, tokenGetter: null,
+      interviewStartAt: null, domainStartAt: null,
     });
   },
 }));

@@ -15,6 +15,7 @@ import { trpc } from "@/lib/trpc";
 import type { ChatMessage, DomainId, ProjectContext, ProjectType } from "@/lib/types";
 import { useAuth } from "@clerk/nextjs";
 import { useToast } from "@/lib/toast";
+import { analytics } from "@/lib/analytics";
 
 const PROVIDER_LABELS: Record<AIProvider, string> = {
   anthropic: "Anthropic",
@@ -159,6 +160,29 @@ export default function InterviewPage({ params }: { params: { id: string } }) {
     store.elaboration,
     flushQueuedSave,
   ]);
+
+  // Observability: interview abandoned
+  useEffect(() => {
+    const handleAbandon = () => {
+      const s = useInterviewStore.getState();
+      if (!s.lockedContext || s.isComplete) return;
+      const elapsed = s.interviewStartAt ? Date.now() - s.interviewStartAt : 0;
+      try {
+        analytics.interviewAbandoned(s.projectId ?? params.id, s.currentDomain, s.completedDomains.length, s.activeDomains.length, elapsed, "");
+      } catch {}
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") handleAbandon();
+    };
+    window.addEventListener("beforeunload", handleAbandon);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("beforeunload", handleAbandon);
+      document.removeEventListener("visibilitychange", onVisibility);
+      // Component unmount (navigation away) also counts as abandon if not complete
+      handleAbandon();
+    };
+  }, [params.id]);
 
   if (projectQuery.isLoading || !hydrated) {
     return <InterviewSkeleton />;

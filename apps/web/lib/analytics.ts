@@ -90,6 +90,15 @@ export const analytics = {
     trackEvent('domain_completed', { projectId, domainId, userId });
   },
 
+  domainCompletedWithTiming: (projectId: string, domainId: string, durationMs: number, provider: string | null, userId: string) => {
+    trackEvent('domain_completed', { projectId, domainId, durationMs, provider, userId });
+    trackEvent('time_per_domain', { projectId, domainId, durationMs, userId });
+  },
+
+  interviewAbandoned: (projectId: string, currentDomain: string, completedCount: number, totalDomains: number, timeSpentMs: number, userId: string) => {
+    trackEvent('interview_abandoned_at_domain', { projectId, currentDomain, completedCount, totalDomains, timeSpentMs, userId });
+  },
+
   // Documentation events
   documentationDownloaded: (projectId: string, format: string, userId: string) => {
     trackEvent('documentation_downloaded', { projectId, format, userId });
