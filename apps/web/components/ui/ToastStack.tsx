@@ -7,16 +7,18 @@ export function ToastStack() {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2">
+    <div aria-live="polite" aria-atomic="true" className="fixed bottom-5 right-5 z-50 flex flex-col gap-2">
       {toasts.map(t => (
         <div
           key={t.id}
+          role="status"
           className="flex items-center gap-3 bg-ink-press text-white text-xs px-4 py-2 rounded-lg animate-toast-in"
         >
           <span className="flex-1">{t.message}</span>
           <button
             type="button"
             onClick={() => dismiss(t.id)}
+            aria-label="Dismiss"
             className="text-vellum/60 hover:text-vellum text-sm leading-none ml-2"
           >
             &times;

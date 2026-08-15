@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 interface Props {
   open: boolean;
@@ -9,13 +9,26 @@ interface Props {
 }
 
 export function BottomSheet({ open, onClose, title, children }: Props) {
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!open) return;
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
+      if (e.key === "Tab" && sheetRef.current) {
+        const focusable = sheetRef.current.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+        if (focusable.length === 0) return;
+        const first = focusable[0], last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
     }
     document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
+    // Move focus into sheet
+    closeRef.current?.focus();
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.removeEventListener("keydown", handleKey); document.body.style.overflow = prevOverflow; };
   }, [open, onClose]);
 
   return (
@@ -24,9 +37,14 @@ export function BottomSheet({ open, onClose, title, children }: Props) {
       <div
         className={`fixed inset-0 bg-deep-charcoal z-40 transition-opacity duration-200 ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}
         onClick={onClose}
+        aria-hidden="true"
       />
       {/* Sheet */}
       <div
+        ref={sheetRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="bottomsheet-title"
         className={`fixed bottom-0 left-0 right-0 bg-white border-t border-hairline rounded-t-lg z-40 max-h-[75vh] overflow-y-auto transition-transform duration-200 ease-out ${open ? "translate-y-0" : "translate-y-full"}`}
       >
         {/* Drag handle */}
@@ -35,11 +53,13 @@ export function BottomSheet({ open, onClose, title, children }: Props) {
         </div>
         {/* Header */}
         <div className="px-5 pb-3 flex items-center justify-between">
-          <span className="font-serif-heading text-[15px] text-ink">{title}</span>
+          <span id="bottomsheet-title" className="font-serif-heading text-[15px] text-ink">{title}</span>
           <button
+            ref={closeRef}
             type="button"
             onClick={onClose}
-            className="text-ink-faint text-lg leading-none hover:text-ink"
+            aria-label="Close"
+            className="text-ink-faint text-lg leading-none hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink"
           >
             &times;
           </button>
