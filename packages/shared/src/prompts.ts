@@ -42,6 +42,7 @@ export function buildSystemPrompt(
   const domainFile   = DOMAIN_FILES[domainId];
   const choicesSummary = buildChoicesSummary(lockedChoices);
   const autoSchemaBlock = domainId === "database" ? getAutoSchemaHint(ctx, elaboration, lockedChoices) : "";
+  const fewShot = getFewShotExample(domainId);
 
   return `You are a senior software architect helping a developer plan a ${typeLabel} project before writing any code. Your role is to ask precise, targeted questions and produce structured documentation that AI coding agents (Claude Code, Cursor, Windsurf) can consume directly.
 
@@ -59,6 +60,8 @@ ${autoSchemaBlock}
 
 ## Current domain
 ${domainLabel} (output file: ${domainFile})
+
+${fewShot}
 
 ## Behaviour rules
 - Be direct and specific. No filler phrases ("Great question!", "Certainly!").
@@ -111,6 +114,23 @@ function getAutoSchemaHint(
 - Platform: ${platformLabel[platform] ?? platform}
 - Start with users/profiles, then ${byType[ctx.projectType] ?? byType.other}
 - Keep 3–5 tables, include id (uuid), created_at (timestamptz), FKs with cascade, RLS notes where applicable. Hint: "${hint}"`;
+}
+
+function getFewShotExample(domainId: DomainId): string {
+  const examples: Record<DomainId, string> = {
+    planning: `## Example for Planning — follow this shape:\n\`\`\`markdown\n## Planning & Scope\n\n**Project:** SaaS product · small team · under 1 month · bootstrapped\n\n**Description:** Habit tracker for remote teams — users create habits, check in daily, see streaks\n\n**MVP:** Create habit → daily check-in → streak view. Defer teams, billing, mobile.\n\n**Success:** 10 daily actives in week 1, check-in success 80%+\n\`\`\``,
+    architecture: `## Example for Architecture:\n\`\`\`markdown\n## Architecture\n\n**Pattern:** Modular Monolith\n\n**Rationale:** small team on under 1 month — microservices add 4–6 weeks overhead\n\n**Scale trigger:** Extract services when team >4 or a service needs independent scaling\n\`\`\``,
+    database: `## Example for Database:\n\`\`\`markdown\n## Database\n\n**Platform:** Supabase\n\n**Data Model:** users (id uuid, email text), profiles (user_id FK users), habits (id uuid, user_id FK, title text), check_ins (habit_id FK, date date)\n\n**Notes:** RLS on all tables, FK cascade, id uuid primary, created_at timestamptz\n\`\`\``,
+    api: `## Example for API:\n\`\`\`markdown\n## API Contracts\n\n**Style:** REST under /v1\n\n**Endpoints:** POST /habits, GET /habits, POST /habits/:id/check-ins, GET /habits/:id/streak\n\n**Auth:** Bearer JWT, 429 rate-limit\n\`\`\``,
+    environment: `## Example for Env Strategy:\n\`\`\`markdown\n## Environment Strategy\n\n**Setup:** Local + Production\n\n**Secrets:** env vars encrypted, never committed\n\n**CI:** typecheck + lint + tests before deploy\n\`\`\``,
+    auth: `## Example for Authentication:\n\`\`\`markdown\n## Authentication\n\n**Provider:** Supabase Auth\n\n**Strategy:** email + OAuth, JWT httpOnly, RLS at DB\n\`\`\``,
+    testing: `## Example for Testing:\n\`\`\`markdown\n## Testing\n\n**Stack:** Vitest + Playwright\n\n**Pyramid:** 70% unit, 20% integration, 10% E2E, 80% coverage on utils\n\`\`\``,
+    monitoring: `## Example for Monitoring:\n\`\`\`markdown\n## Monitoring\n\n**Stack:** Sentry + PostHog\n\n**Signals:** latency, traffic, errors, saturation — alerts on p95 >500ms, error rate >1%\n\`\`\``,
+    frontend: `## Example for Frontend:\n\`\`\`markdown\n## Frontend\n\n**Stack:** Next.js + Tailwind\n\n**Screens:** Login → Dashboard (habit list) → Habit detail (calendar) → Settings\n\n**Perf:** Lighthouse ≥90, bundle <250KB\n\`\`\``,
+    deployment: `## Example for Deployment:\n\`\`\`markdown\n## Deployment\n\n**Platform:** Vercel\n\n**Pipeline:** push main → preview → promote to prod after E2E, rollback 60s\n\`\`\``,
+  };
+  const ex = examples[domainId];
+  return ex ? `\n${ex}\n` : "";
 }
 
 function buildChoicesSummary(
