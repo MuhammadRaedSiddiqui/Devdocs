@@ -3,8 +3,8 @@
 // Integration point remaining: persistToSupabase() (see prompt 3).
 import { create } from "zustand";
 import type { ChatMessage, DomainDefinition, DomainId, DomainPhase, ProjectContext } from "@/lib/types";
-import { DOMAINS, getActiveDomains, getOpener, buildFullDocument, nextDomainId } from "@/lib/interview/domains";
-import { CARD_CHOICES } from "@/lib/interview/choices";
+import { DOMAINS, getActiveDomains, getDomain, getOpener, buildFullDocument, nextDomainId } from "@/lib/interview/domains";
+import { CARD_CHOICES, getAutoChoice } from "@/lib/interview/choices";
 import { getActiveConfig, setActiveProvider, type AIProvider } from "@/lib/ai/provider";
 import { streamAIResponse, type StreamErrorType } from "@/lib/ai/stream";
 import { SessionLogger } from "@/lib/session/logger";
@@ -322,6 +322,25 @@ function completeDomain(set: SetFn, get: GetFn, domainId: DomainId, content: str
       true
     );
     return;
+  }
+  // Adaptive branching: auto-pick for solo when choice is obvious
+  const ctx = get().lockedContext;
+  if (ctx) {
+    const auto = getAutoChoice(next, ctx);
+    if (auto) {
+      const key = getDomain(next).requiredChoiceKey;
+      if (key) {
+        set({ currentDomain: next, domainStartAt: Date.now() });
+        // Small delay for UI to show transition, then auto-lock
+        setTimeout(() => {
+          const s = get();
+          if (s.currentDomain === next && !s.completedDomains.includes(next) && !s.isThinking && !s.isStreaming) {
+            s.lockDomainChoice(next, key, auto);
+          }
+        }, 350);
+        return;
+      }
+    }
   }
   set({ currentDomain: next, domainStartAt: Date.now() });
   runOpener(set, get, next);

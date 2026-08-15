@@ -56,3 +56,12 @@ export function getDefaultChoice(domain: DomainId, ctx: ProjectContext): string 
   if (!options) return null;
   return options.find((o) => o.isRecommended?.(ctx))?.id ?? options[0]?.id ?? null;
 }
+
+export function getAutoChoice(domain: DomainId, ctx: ProjectContext): string | null {
+  // Auto-pick for solo to cut interview 8→5 domains; only when choice is obvious
+  if (ctx.teamSize !== "solo") return null;
+  if (domain === "environment") return "two_envs";
+  if (domain === "testing" && ctx.budget === "bootstrapped") return "vitest_only";
+  if (domain === "monitoring" && ctx.budget === "bootstrapped") return "sentry_only";
+  return null;
+}
