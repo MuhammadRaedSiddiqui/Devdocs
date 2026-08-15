@@ -34,27 +34,6 @@ const config: Config = {
         serif: ["var(--font-apple-system-body)"],
         mono: ["var(--font-mono)"],
       },
-      fontSize: {
-        "stitch-display": ["56px", { lineHeight: "1.2", fontWeight: "330" }],
-        "stitch-h2": ["30px", { lineHeight: "1.33", fontWeight: "400" }],
-        "stitch-h3": ["24px", { lineHeight: "1.33", fontWeight: "400" }],
-        "stitch-h4": ["18px", { lineHeight: "1.33", fontWeight: "400" }],
-        "stitch-body-lg": ["16px", { lineHeight: "1.5", fontWeight: "400" }],
-        "stitch-body-md": ["15px", { lineHeight: "1.4", fontWeight: "400" }],
-        "stitch-body-sm": ["14px", { lineHeight: "1.4", fontWeight: "400" }],
-        "stitch-caption": ["12px", { lineHeight: "1.33", fontWeight: "400" }],
-        "stitch-label-caps": ["11px", { lineHeight: "1.33", fontWeight: "500" }],
-      },
-      spacing: {
-        "stitch-unit": "var(--stitch-unit)",
-        "stitch-gap-xs": "var(--stitch-gap-xs)",
-        "stitch-gap-md": "var(--stitch-gap-md)",
-        "stitch-gap-lg": "var(--stitch-gap-lg)",
-        "stitch-section-xl": "var(--stitch-section-xl)",
-      },
-      maxWidth: {
-        "stitch-container-max": "var(--stitch-container-max)",
-      },
       borderRadius: {
         vellum: "var(--radius-lg)",
       },

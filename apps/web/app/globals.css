@@ -67,18 +67,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   outline-offset: 2px;
 }
 
-.font-serif-heading, .font-stitch-serif, .font-stitch-sans { font-family: var(--font-apple-system-body); }
-.font-serif-heading { font-weight: 600; }
-.font-stitch-mono { font-family: var(--font-mono); }
-.text-stitch-display, .text-stitch-h2, .text-stitch-h3, .text-stitch-h4 {
-  font-family: var(--font-apple-system-body);
-  font-size: var(--text-heading);
-  line-height: var(--leading-heading);
-  font-weight: 600;
-}
-.text-stitch-body-lg { font-size: var(--text-body); line-height: var(--leading-body); }
-.text-stitch-body-md, .text-stitch-body-sm { font-size: var(--text-caption); line-height: var(--leading-caption); }
-.text-stitch-caption, .text-stitch-label-caps { font-size: 12px; line-height: var(--leading-caption); }
+.font-serif-heading { font-family: var(--font-apple-system-body); font-weight: 600; }
 
 .badge-blue, .badge-green, .badge-amber, .badge-purple, .badge-orange {
   background: var(--color-sidebar-mist);
