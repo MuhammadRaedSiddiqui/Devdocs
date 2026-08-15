@@ -160,7 +160,7 @@ test.describe('Interview — Phase 0-3', () => {
     await mockProjectGet(page, withHistory);
     await page.goto(`/project/${fakeProjectId}/interview`);
     // DomainProgress should show Planning and Architecture as done with ✓
-    await expect(page.getByText('Planning & Scope')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Planning & Scope').first()).toBeVisible({ timeout: 10000 });
     const archRow = page.getByRole('button', { name: /Revisit Architecture/ });
     await expect(archRow).toBeVisible();
     await expect(archRow.getByText('↩ revisit')).toBeHidden(); // hidden until hover
