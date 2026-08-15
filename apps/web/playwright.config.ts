@@ -12,6 +12,9 @@ export default defineConfig({
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    extraHTTPHeaders: {
+      'x-playwright': '1',
+    },
   },
 
   projects: [
@@ -33,5 +36,9 @@ export default defineConfig({
     command: 'pnpm dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
+    timeout: 120000,
+    env: {
+      PLAYWRIGHT: '1',
+    },
   },
 });

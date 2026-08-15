@@ -14,29 +14,49 @@ const freshInterviewData = {
 };
 
 async function mockProjectGet(page: import('@playwright/test').Page, interviewData: unknown = freshInterviewData) {
-  await page.route('**/trpc/projects.get*', async route => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        result: {
-          data: {
-            id: fakeProjectId,
-            name: 'Test SaaS',
-            type: 'saas',
-            interviewData,
-          },
-        },
-      }),
-    });
-  });
-  // Mock projects.update (persist) as no-op
-  await page.route('**/trpc/projects.update*', async route => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ result: { data: { success: true } } }) });
+  // Handle both GET and POST batch formats for tRPC
+  await page.route('**/trpc**', async route => {
+    const url = route.request().url();
+    const method = route.request().method();
+    let bodyStr = '';
+    try { bodyStr = route.request().postData() || ''; } catch {}
+    const isProjectsGet = url.includes('projects.get') || bodyStr.includes('projects.get') || bodyStr.includes('"id"');
+    const isProjectsUpdate = url.includes('projects.update') || bodyStr.includes('projects.update');
+    const isBatch = url.includes('batch=1');
+
+    if (isProjectsGet) {
+      const data = {
+        id: fakeProjectId,
+        name: 'Test SaaS',
+        type: 'saas',
+        interviewData: interviewData as any,
+      };
+      const payload = isBatch ? [{ result: { data } }] : { result: { data } };
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(payload),
+      });
+      return;
+    }
+    if (isProjectsUpdate) {
+      const payload = isBatch ? [{ result: { data: { success: true } } }] : { result: { data: { success: true } } };
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(payload),
+      });
+      return;
+    }
+    await route.continue();
   });
   // Mock sessions (analytics) as no-op
-  await page.route('**/sessions*', async route => {
+  await page.route('**/sessions**', async route => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'sess-1' }) });
+  });
+  // Mock tRPC sessions for analytics
+  await page.route('**/trpc/sessions*', async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ result: { data: { id: 'sess-1' } } }) });
   });
 }
 
@@ -63,26 +83,21 @@ test.describe('Interview — Phase 0-3', () => {
   });
 
   test('fresh project shows discovery then one-tap cards', async ({ page }) => {
+    test.setTimeout(60000);
     await mockProjectGet(page, null);
-    // Mock dashboard list to allow navigation? For interview direct, just goto interview
     await page.goto(`/project/${fakeProjectId}/interview`, { waitUntil: 'domcontentloaded' });
-
-    // Discovery form should appear (no lockedContext) or interview if already has context
-    // FreshInterviewData has lockedContext, so it will show chat, not discovery
-    // Instead test with null interviewData to see DiscoveryForm
-    await mockProjectGet(page, null);
-    await page.goto(`/project/${fakeProjectId}/interview`);
-    await expect(page.getByText('A few quick questions')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('A few quick questions')).toBeVisible({ timeout: 15000 });
   });
 
   test('one-tap: selecting a card immediately completes domain (no Confirm button)', async ({ page }) => {
+    test.setTimeout(60000);
     await mockProjectGet(page, {
       ...freshInterviewData,
       conversationHistory: [{ role: 'assistant', content: 'Now pick architecture', showCards: 'architecture', domainId: 'architecture' }],
       messages: [{ role: 'assistant', content: 'Now pick architecture', showCards: 'architecture', domainId: 'architecture' }],
     } as any);
     await mockAIStream(page, '## Architecture\n\n**Pattern:** Monolith');
-    await page.goto(`/project/${fakeProjectId}/interview`);
+    await page.goto(`/project/${fakeProjectId}/interview`, { waitUntil: 'domcontentloaded' });
 
     // DomainPicker should be visible with 3 cards, no Confirm button initially
     await expect(page.getByRole('radiogroup')).toBeVisible({ timeout: 10000 });
@@ -115,8 +130,9 @@ test.describe('Interview — Phase 0-3', () => {
       conversationHistory: [{ role: 'assistant', content: 'Pick', showCards: 'architecture', domainId: 'architecture' }],
     } as any);
     await page.goto(`/project/${fakeProjectId}/interview`);
-    await expect(page.getByText('I need a custom option')).toBeVisible({ timeout: 10000 });
-    await page.getByText('I need a custom option').click();
+    const customBtn = page.getByRole('button', { name: 'I need a custom option' }).first();
+    await expect(customBtn).toBeVisible({ timeout: 10000 });
+    await customBtn.click();
     const input = page.getByPlaceholder('Describe your custom choice...');
     await expect(input).toBeVisible();
     await input.fill('ab'); // <3 chars

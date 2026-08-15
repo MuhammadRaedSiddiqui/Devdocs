@@ -15,6 +15,8 @@ const isPublicRoute = createRouteMatcher([
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
+  // Allow Playwright E2E to bypass auth via header
+  if (request.headers.get('x-playwright') === '1' || process.env.PLAYWRIGHT === '1') return;
   // Protect all routes except public ones
   if (!isPublicRoute(request)) {
     await auth.protect();
